@@ -63,14 +63,22 @@ def rewrite_model_xml(src: Path, dst: Path, replacements: dict[str, str]) -> Non
     dst.write_text(text)
 
 
+# Height of the floating mount for the bimanual "showroom" scene. The arm
+# hangs ~0.62 m below its mount frame at full downward reach, so 1.05 m keeps
+# every full-range sweep clear of the floor (pinned by tests/test_web_scene.py).
+SCENE_MOUNT_HEIGHT = 1.05
+
+
 def write_scene_xml(dst: Path) -> None:
     dst.write_text(
-        """<mujoco model="anvil_openarm_bimanual scene">
-  <statistic center="0 0 0.55" extent="1.2"/>
+        f"""<mujoco model="anvil_openarm_bimanual scene">
+  <option timestep="0.001"/>
+
+  <statistic center="0 0 0.85" extent="1.4"/>
 
   <visual>
     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0.2 0.2 0.2"/>
-    <rgba haze="0.75 0.82 0.86 1"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
     <global azimuth="150" elevation="-20"/>
   </visual>
 
@@ -78,11 +86,21 @@ def write_scene_xml(dst: Path) -> None:
     <texture type="skybox" builtin="gradient" rgb1="0.78 0.84 0.88" rgb2="1 1 1" width="512" height="3072"/>
     <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.62 0.67 0.64" rgb2="0.48 0.54 0.52" markrgb="0.9 0.9 0.86" width="300" height="300"/>
     <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="6 6" reflectance="0.12"/>
+    <material name="mount_column" rgba="0.28 0.30 0.31 1" reflectance="0.05"/>
     <model name="bimanual" file="anvil_openarm_bimanual.xml"/>
   </asset>
 
   <worldbody>
-    <attach model="bimanual" prefix=""/>
+    <!-- visual-only stand (contype/conaffinity 0) so full-range joint sweeps
+         never collide with it -->
+    <geom name="mount_base" type="cylinder" size="0.11 0.006" pos="0 0 0.006"
+          material="mount_column" contype="0" conaffinity="0"/>
+    <geom name="mount_column" type="cylinder" size="0.028 {SCENE_MOUNT_HEIGHT / 2}"
+          pos="0 0 {SCENE_MOUNT_HEIGHT / 2}" material="mount_column"
+          contype="0" conaffinity="0"/>
+    <body name="mount" pos="0 0 {SCENE_MOUNT_HEIGHT}">
+      <attach model="bimanual" prefix=""/>
+    </body>
     <light pos="0 0 3" dir="0 0 -1" directional="false"/>
     <geom name="floor" size="0 0 .125" type="plane" material="groundplane" conaffinity="15" condim="3"/>
   </worldbody>

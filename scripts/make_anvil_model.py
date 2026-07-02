@@ -128,6 +128,14 @@ FILES: dict[str, dict] = {
                 '  <option timestep="0.001" />',
             ),
             literal('file="cell.xml"', 'file="anvil_cell.xml"'),
+            # upstream parks the tray directly under the left gripper's home
+            # rest pose; the resting contact against the low-gain wrist servos
+            # never settles (J6 limit cycle at several rad/s). Move it outboard
+            # on the sheet, clear of both arms (sheet spans y +/-0.45).
+            literal(
+                '<body name="black_frame" pos="0.47 0.15 1.005">',
+                '<body name="black_frame" pos="0.47 0.28 1.005">',
+            ),
         ],
     },
     "pedestal.xml": {

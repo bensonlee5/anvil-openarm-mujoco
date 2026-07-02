@@ -3,9 +3,10 @@ export type DemoId =
   | "pedestal"
   | "cell"
   | "manipulation"
-  | "wrist-sweep";
+  | "wrist-sweep"
+  | "full-rom";
 
-export type ScriptedController = "wristSweep";
+export type ScriptedController = "wristSweep" | "fullRom";
 
 export interface DemoDefinition {
   id: DemoId;
@@ -28,8 +29,8 @@ export const DEMOS: DemoDefinition[] = [
     description: "Open the generated Anvil OpenARM bimanual model in a neutral scene.",
     xmlPath: "scene.xml",
     camera: {
-      position: [2.1, 1.55, 2.0],
-      target: [0, 0.68, 0],
+      position: [2.15, 1.75, 2.05],
+      target: [0, 0.85, 0],
     },
   },
   {
@@ -75,6 +76,19 @@ export const DEMOS: DemoDefinition[] = [
     camera: {
       position: [1.6, 1.55, 1.45],
       target: [0, 0.92, 0],
+    },
+  },
+  {
+    id: "full-rom",
+    title: "Full Range of Motion",
+    eyebrow: "Scripted motion",
+    description:
+      "Sweep every joint J1–J7 and the gripper through its full Anvil range, one joint at a time on both arms.",
+    xmlPath: "scene.xml",
+    script: "fullRom",
+    camera: {
+      position: [2.6, 1.95, 2.45],
+      target: [0, 0.95, 0],
     },
   },
 ];

@@ -4,6 +4,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { DemoDefinition } from "./demos";
 import { describeCommandSurface, type LoaderProfile } from "./loaderProfiles";
 import { getMujoco, prepareAssets, WORKING_ROOT } from "./mujocoAssets";
+import { Reflector } from "./vendor/Reflector";
 import type { MainModule, MjData, MjModel } from "@mujoco/mujoco";
 
 type Side = "left" | "right";
@@ -94,7 +95,8 @@ export class ViewerApp {
   private model!: MjModel;
   private data!: MjData;
   private mujocoRoot?: THREE.Group;
-  private showroomRoot?: THREE.Group;
+  private floorTexture?: THREE.Texture;
+  private scriptStatus = "";
   private activeSide: Side = "left";
   private paused = false;
   private lastTimeMs = 0;
@@ -140,18 +142,23 @@ export class ViewerApp {
     viewer.append(this.stage, this.panel);
     this.root.append(viewer);
 
+    // mujoco_anywhere-style environment: dark slate background with matching
+    // fog; the floor comes from the model's plane geom as a Reflector
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x172522);
-    this.scene.fog = new THREE.Fog(0x172522, 9, 24);
+    // interpret the reference color as sRGB so it renders as the same dark
+    // slate as mujoco_anywhere rather than being brightened on output
+    const horizon = new THREE.Color().setRGB(0.15, 0.25, 0.35, THREE.SRGBColorSpace);
+    this.scene.background = horizon;
+    this.scene.fog = new THREE.Fog(horizon, 15, 25.5);
 
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.001, 100);
     this.scene.add(this.camera);
 
-    const ambient = new THREE.AmbientLight(0xe7fff7, 0.34);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.28);
     this.scene.add(ambient);
-    const hemisphere = new THREE.HemisphereLight(0xd8fff4, 0x2f3f3a, 0.58);
+    const hemisphere = new THREE.HemisphereLight(0xcfe0ec, 0x1d2b33, 0.5);
     this.scene.add(hemisphere);
-    const key = new THREE.DirectionalLight(0xffffff, 1.9);
+    const key = new THREE.DirectionalLight(0xffffff, 2.1);
     key.position.set(3.4, 5.2, 3.1);
     key.castShadow = true;
     key.shadow.mapSize.width = 2048;
@@ -159,13 +166,9 @@ export class ViewerApp {
     key.shadow.camera.near = 0.1;
     key.shadow.camera.far = 18;
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xa9d7d0, 0.68);
+    const fill = new THREE.DirectionalLight(0xbdd2e0, 0.55);
     fill.position.set(-3.6, 2.4, -2.8);
     this.scene.add(fill);
-    const rim = new THREE.DirectionalLight(0x9ce0c9, 0.82);
-    rim.position.set(-1.8, 3.3, 4.2);
-    this.scene.add(rim);
-    this.buildShowroomScene();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -223,7 +226,8 @@ export class ViewerApp {
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.disposeSceneObjects();
-    this.disposeShowroomScene();
+    this.floorTexture?.dispose();
+    this.floorTexture = undefined;
     this.renderer.dispose();
     this.data?.delete();
     this.model?.delete();
@@ -452,13 +456,17 @@ export class ViewerApp {
       ${this.loaderProfile ? `<div class="hud__pill">${escapeHtml(this.loaderProfile.title)}</div>` : ""}
       <div class="hud__pill">${SIDE_LABEL[this.activeSide]}</div>
       <div class="hud__pill">${this.paused ? "Paused" : `${this.data?.time.toFixed(2) ?? "0.00"}s`}</div>
+      ${this.demo.script && this.scriptStatus ? `<div class="hud__pill">${escapeHtml(this.scriptStatus)}</div>` : ""}
     `;
     const status = this.panel.querySelector<HTMLDivElement>("[data-status]");
     if (status) {
       const profile = this.loaderProfile
         ? `${this.loaderProfile.title}: ${this.loaderProfile.repoSupport} `
         : "";
-      status.textContent = `${profile}${SIDE_LABEL[this.activeSide]} selected. ${this.demo.script === "wristSweep" ? "Wrist sweep is driving J6/J7." : "Keyboard and sliders drive joint-space targets."}`;
+      const activity = this.demo.script
+        ? this.scriptStatus || "Scripted motion running."
+        : "Keyboard and sliders drive joint-space targets.";
+      status.textContent = `${profile}${SIDE_LABEL[this.activeSide]} selected. ${activity}`;
     }
   }
 
@@ -501,9 +509,14 @@ export class ViewerApp {
   }
 
   private applyScriptedController(): void {
-    if (this.demo.script !== "wristSweep") {
-      return;
+    if (this.demo.script === "wristSweep") {
+      this.applyWristSweep();
+    } else if (this.demo.script === "fullRom") {
+      this.applyFullRom();
     }
+  }
+
+  private applyWristSweep(): void {
     const phaseSeconds = 6.0;
     const blendSeconds = 1.0;
     const settleSeconds = 2.0;
@@ -514,6 +527,7 @@ export class ViewerApp {
     }
 
     if (t < 0) {
+      this.scriptStatus = "Raising elbows…";
       return;
     }
 
@@ -523,6 +537,11 @@ export class ViewerApp {
     const blend =
       smoothstep(tIn / blendSeconds) *
       smoothstep((phaseSeconds - tIn) / blendSeconds);
+    this.scriptStatus = [
+      "Sweeping J6 deviation",
+      "Sweeping J7 flexion/extension",
+      "Combined wrist circles",
+    ][phase];
 
     for (const side of ["left", "right"] as const) {
       if (phase === 0 || phase === 2) {
@@ -532,6 +551,54 @@ export class ViewerApp {
         const signal = phase === 2 ? Math.cos(2 * Math.PI * s) : Math.sin(2 * Math.PI * s);
         this.setSweptTarget(side, "joint7", signal, blend);
       }
+    }
+  }
+
+  /** Sweep every actuated joint through its full range, one joint at a time.
+   *  Wrist and gripper phases raise the elbows first so the motion is
+   *  visible and clear of the floor. Feasibility of every full-range sweep
+   *  is pinned by tests/test_web_scene.py. */
+  private applyFullRom(): void {
+    const phaseSeconds = 6.0;
+    const blendSeconds = 1.0;
+    const settleSeconds = 2.0;
+    const elbowUpFor = new Set(["joint5", "joint6", "joint7", "finger1"]);
+    const postureJ4 = (key: string): number =>
+      elbowUpFor.has(key) ? Math.PI / 2 : 0;
+
+    const t = this.data.time - settleSeconds;
+    if (t < 0) {
+      this.scriptStatus = "Settling at home pose…";
+      return;
+    }
+
+    const keys = ARM_CONTROL_SPECS.map((spec) => spec.key);
+    const idx = Math.floor(t / phaseSeconds) % keys.length;
+    const key = keys[idx];
+    const s = (t % phaseSeconds) / phaseSeconds;
+    const tIn = t % phaseSeconds;
+    const blend =
+      smoothstep(tIn / blendSeconds) *
+      smoothstep((phaseSeconds - tIn) / blendSeconds);
+
+    const spec = ARM_CONTROL_SPECS[idx];
+    const sample = this.findTarget("left", key) ?? this.findTarget("right", key);
+    const range = sample
+      ? ` (${radToDeg(sample.min).toFixed(0)}° … ${radToDeg(sample.max).toFixed(0)}°)`
+      : "";
+    this.scriptStatus = `Sweeping ${spec.label}${range} — ${idx + 1}/${keys.length}`;
+
+    // ease the elbow posture between phases so transitions never jump
+    const prevKey = keys[(idx + keys.length - 1) % keys.length];
+    const j4 =
+      postureJ4(prevKey) +
+      (postureJ4(key) - postureJ4(prevKey)) * smoothstep(tIn / blendSeconds);
+
+    for (const side of ["left", "right"] as const) {
+      if (key !== "joint4") {
+        this.setTarget(side, "joint4", j4);
+      }
+      this.setSweptTarget(side, key, Math.sin(2 * Math.PI * s), blend);
     }
   }
 
@@ -639,65 +706,37 @@ export class ViewerApp {
     this.controls.update();
   }
 
-  private buildShowroomScene(): void {
-    this.showroomRoot = new THREE.Group();
-    this.showroomRoot.name = "Showroom Root";
-    this.scene.add(this.showroomRoot);
-
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(18, 18),
-      new THREE.MeshStandardMaterial({
-        color: 0xb9c5c1,
-        roughness: 0.82,
-        metalness: 0.02,
-      }),
-    );
-    floor.name = "Showroom floor";
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.002;
-    floor.receiveShadow = true;
-    this.showroomRoot.add(floor);
-
-    const grid = new THREE.GridHelper(12, 36, 0x5ab4a0, 0x78908a);
-    grid.name = "Showroom floor grid";
-    grid.position.y = 0.004;
-    const gridMaterial = grid.material as THREE.Material | THREE.Material[];
-    for (const material of Array.isArray(gridMaterial) ? gridMaterial : [gridMaterial]) {
-      material.transparent = true;
-      material.opacity = 0.2;
-      material.depthWrite = false;
+  /** Classic MuJoCo checker floor texture, shared by all plane geoms. */
+  private getFloorTexture(): THREE.Texture {
+    if (this.floorTexture) {
+      return this.floorTexture;
     }
-    this.showroomRoot.add(grid);
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+    const light = "rgb(158, 171, 163)"; // ~ groundplane rgb1 0.62 0.67 0.64
+    const dark = "rgb(122, 138, 133)"; // ~ groundplane rgb2 0.48 0.54 0.52
+    const half = size / 2;
+    ctx.fillStyle = light;
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = dark;
+    ctx.fillRect(0, 0, half, half);
+    ctx.fillRect(half, half, half, half);
+    // mark="edge" style tile border
+    ctx.strokeStyle = "rgba(230, 230, 219, 0.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, size, size);
 
-    const backPanel = new THREE.Mesh(
-      new THREE.PlaneGeometry(14, 7),
-      new THREE.MeshBasicMaterial({
-        color: 0x21332f,
-        transparent: true,
-        opacity: 0.36,
-        side: THREE.DoubleSide,
-      }),
-    );
-    backPanel.name = "Showroom rear plane";
-    backPanel.position.set(0, 3.2, -5.2);
-    this.showroomRoot.add(backPanel);
-
-    const referenceLines = new THREE.Group();
-    referenceLines.name = "Showroom reference lines";
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x9ce0c9,
-      transparent: true,
-      opacity: 0.18,
-    });
-    for (const y of [1.2, 2.4, 3.6, 4.8]) {
-      const points = [new THREE.Vector3(-6, y, -5.15), new THREE.Vector3(6, y, -5.15)];
-      referenceLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lineMaterial));
-    }
-    for (const x of [-4, -2, 0, 2, 4]) {
-      const points = [new THREE.Vector3(x, 0.35, -5.14), new THREE.Vector3(x, 5.4, -5.14)];
-      referenceLines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lineMaterial));
-    }
-    this.showroomRoot.add(referenceLines);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(50, 50); // 1 m squares over the 100 m reflector plane
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    this.floorTexture = texture;
+    return texture;
   }
 
   private resize(): void {
@@ -759,7 +798,15 @@ export class ViewerApp {
     let geometry: THREE.BufferGeometry | undefined;
 
     if (type === this.mujoco.mjtGeom.mjGEOM_PLANE.value) {
-      geometry = new THREE.PlaneGeometry(60, 60);
+      // mirror floor blended with the checker, like mujoco_anywhere
+      const reflector = new Reflector(new THREE.PlaneGeometry(100, 100), {
+        clipBias: 0.003,
+        texture: this.getFloorTexture(),
+      });
+      reflector.name = `floor-geom-${geomId}`;
+      reflector.castShadow = false;
+      reflector.receiveShadow = true;
+      return reflector;
     } else if (type === this.mujoco.mjtGeom.mjGEOM_SPHERE.value) {
       geometry = new THREE.SphereGeometry(sx, 32, 18);
     } else if (type === this.mujoco.mjtGeom.mjGEOM_CAPSULE.value) {
@@ -897,6 +944,9 @@ export class ViewerApp {
       return;
     }
     this.mujocoRoot.traverse((object) => {
+      if (object instanceof Reflector) {
+        object.disposeReflector();
+      }
       if (object instanceof THREE.Mesh) {
         object.geometry.dispose();
         const materials = Array.isArray(object.material)
@@ -907,23 +957,6 @@ export class ViewerApp {
     });
     this.scene.remove(this.mujocoRoot);
     this.mujocoRoot = undefined;
-  }
-
-  private disposeShowroomScene(): void {
-    if (!this.showroomRoot) {
-      return;
-    }
-    this.showroomRoot.traverse((object) => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
-        object.geometry.dispose();
-        const materials = Array.isArray(object.material)
-          ? object.material
-          : [object.material];
-        materials.forEach((material) => material.dispose());
-      }
-    });
-    this.scene.remove(this.showroomRoot);
-    this.showroomRoot = undefined;
   }
 }
 

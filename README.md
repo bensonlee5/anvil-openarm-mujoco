@@ -75,8 +75,13 @@ npm --prefix web run dev
 npm --prefix web run build
 ```
 
-The splash page exposes the bimanual, pedestal, workcell, manipulation, and
-wrist-sweep demos. It also exposes the OpenArm v2 loader profiles from
+The splash page exposes the bimanual, pedestal, workcell, manipulation,
+wrist-sweep, and full range-of-motion demos. The full-ROM demo sweeps every
+joint (J1–J7 and the gripper) through its complete Anvil range on both arms,
+one joint at a time; sweep feasibility on the showroom stage is pinned by
+`tests/test_web_scene.py`. The viewer renders a mujoco_anywhere-style
+environment: dark slate horizon and a mirror-blended checker floor that
+reflects the robot. It also exposes the OpenArm v2 loader profiles from
 `upstream/anvil_loader/config/openarm_v2_*.yaml`:
 
 - `?config=openarm_v2_inference`
