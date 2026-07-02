@@ -1,8 +1,6 @@
 export type DemoId =
   | "bimanual"
   | "pedestal"
-  | "cell"
-  | "manipulation"
   | "wrist-sweep"
   | "full-rom";
 
@@ -42,28 +40,6 @@ export const DEMOS: DemoDefinition[] = [
     camera: {
       position: [2.25, 1.7, 2.2],
       target: [0, 0.82, 0],
-    },
-  },
-  {
-    id: "cell",
-    title: "Workcell",
-    eyebrow: "Cell scene",
-    description: "Explore the OpenArm workcell with lifter, sheet, walls, and the bimanual arm.",
-    xmlPath: "cell.xml",
-    camera: {
-      position: [2.35, 1.95, 2.3],
-      target: [0.15, 0.9, -0.05],
-    },
-  },
-  {
-    id: "manipulation",
-    title: "Manipulation Demo",
-    eyebrow: "Props",
-    description: "Load the workcell with manipulable objects for browser-side interaction.",
-    xmlPath: "demo.xml",
-    camera: {
-      position: [2.2, 1.85, 2.05],
-      target: [0.25, 0.94, -0.02],
     },
   },
   {

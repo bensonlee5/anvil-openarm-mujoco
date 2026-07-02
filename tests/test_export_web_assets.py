@@ -1,7 +1,9 @@
 from scripts.export_web_assets import (
     ANVIL_LOADER_CONFIGS,
     OPENARM_V2_CONFIG_FILES,
+    OUT,
     extract_loader_profile,
+    main as export_web_assets,
 )
 
 
@@ -39,3 +41,14 @@ def test_extracts_openarm_v2_loader_profiles_from_submodule():
             "vrController": "right",
         },
     ]
+
+
+def test_export_omits_removed_workcell_and_manipulation_demos():
+    assert export_web_assets() == 0
+
+    assert not (OUT / "cell.xml").exists()
+    assert not (OUT / "demo.xml").exists()
+
+    manifest = (OUT / "manifest.json").read_text()
+    assert '"cell.xml"' not in manifest
+    assert '"demo.xml"' not in manifest

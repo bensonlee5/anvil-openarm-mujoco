@@ -92,25 +92,6 @@ def test_scene_uses_one_ms_timestep(scene_model):
     assert scene_model.opt.timestep == pytest.approx(0.001)
 
 
-def test_manipulation_demo_settles_calm(scene_model):
-    """The demo scene must not park either gripper on a prop: resting contact
-    between the low-gain wrist servos and the black-frame tray forms a
-    persistent limit cycle (J6 buzzing at several rad/s)."""
-    model = mujoco.MjModel.from_xml_path(str(SCENE.parent / "demo.xml"))
-    data = reset(model)
-    for _ in range(round(3.0 / model.opt.timestep)):
-        mujoco.mj_step(model, data)
-    peak = 0.0
-    for _ in range(round(1.0 / model.opt.timestep)):
-        mujoco.mj_step(model, data)
-        peak = max(peak, float(np.max(np.abs(data.qvel))))
-    assert np.all(np.isfinite(data.qpos))
-    assert peak < 0.5, (
-        f"demo scene still oscillating after settling (|qvel|max={peak:.2f} "
-        "rad/s over t=3..4 s) — a gripper is likely resting on a prop"
-    )
-
-
 def test_full_rom_sweep_every_joint(scene_model):
     """Sweep each actuated joint (both arms together) through its full
     ctrlrange; the sim must stay finite and reach >=95% of the range."""

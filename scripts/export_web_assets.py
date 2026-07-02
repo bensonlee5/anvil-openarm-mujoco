@@ -272,16 +272,6 @@ def main() -> int:
         OUT / "pedestal.xml",
         {},
     )
-    rewrite_model_xml(
-        MODELS / "anvil_cell.xml",
-        OUT / "cell.xml",
-        {},
-    )
-    rewrite_model_xml(
-        MODELS / "anvil_demo.xml",
-        OUT / "demo.xml",
-        {'file="anvil_cell.xml"': 'file="cell.xml"'},
-    )
     write_scene_xml(OUT / "scene.xml")
     write_loader_profiles(OUT / "openarm_v2_configs.json")
 

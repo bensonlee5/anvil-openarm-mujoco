@@ -13,8 +13,8 @@ implementation differences from Anvil's hardware stack.
 
 What's in this repo:
 
-- **MJCF models** of the Anvil OpenARM 2.0 (bimanual arm, pedestal, workcell,
-  and manipulation-demo scenes), derived from the upstream
+- **MJCF models** of the Anvil OpenARM 2.0 (bimanual arm and pedestal scenes),
+  derived from the upstream
   [enactic/openarm_mujoco](https://github.com/enactic/openarm_mujoco) v2 files
   (vendored as a git submodule) by a generator script that applies this repo's
   local Anvil joint-limit spec and TCP frames
@@ -75,8 +75,8 @@ npm --prefix web run dev
 npm --prefix web run build
 ```
 
-The splash page exposes the bimanual, pedestal, workcell, manipulation,
-wrist-sweep, and full range-of-motion demos. The full-ROM demo sweeps every
+The splash page exposes the bimanual, pedestal, wrist-sweep, and full
+range-of-motion demos. The full-ROM demo sweeps every
 joint (J1–J7 and the gripper) through its complete Anvil range on both arms,
 one joint at a time; sweep feasibility on the showroom stage is pinned by
 `tests/test_web_scene.py`. The viewer renders a mujoco_anywhere-style
@@ -160,8 +160,6 @@ scripts/run_docker.sh viewer-smoke
 |---|---|
 | `models/anvil_openarm_bimanual.xml` | the bimanual arm + grippers, no scene |
 | `models/anvil_pedestal.xml` | arm on a pedestal with floor and lighting |
-| `models/anvil_cell.xml` | arm in the OpenArm workcell (lifter, sheet, walls) |
-| `models/anvil_demo.xml` | workcell + manipulable props (cube, tray) |
 
 All are **generated files** — edit `scripts/make_anvil_model.py` (or upstream)
 and regenerate rather than editing them directly.

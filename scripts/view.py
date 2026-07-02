@@ -2,7 +2,7 @@
 """Open an Anvil OpenARM 2.0 model in an interactive MuJoCo viewer.
 
 Usage:
-    uv run python scripts/view.py [models/anvil_demo.xml] [--keyframe home]
+    uv run python scripts/view.py [models/anvil_pedestal.xml] [--keyframe home]
 """
 
 import argparse

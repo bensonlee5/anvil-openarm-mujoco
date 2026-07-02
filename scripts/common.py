@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MODEL = ROOT / "models" / "anvil_demo.xml"
+DEFAULT_MODEL = ROOT / "models" / "anvil_pedestal.xml"
 
 
 def interactive_loop(model, data, step_fn=None) -> None:
