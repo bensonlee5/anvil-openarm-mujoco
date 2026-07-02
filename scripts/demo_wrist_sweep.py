@@ -10,10 +10,6 @@ actuator ctrlranges (so it always demonstrates exactly the Anvil ranges):
 
 Usage:
     uv run python scripts/demo_wrist_sweep.py [models/anvil_pedestal.xml]
-
-On macOS this uses mujoco-python-viewer by default (the stock mjpython
-viewer currently crashes on recent macOS); pass --official to try the stock
-MuJoCo viewer instead.
 """
 
 import argparse
@@ -42,11 +38,6 @@ def main() -> None:
         "--headless",
         action="store_true",
         help="run one full cycle without the viewer and report achieved ranges",
-    )
-    parser.add_argument(
-        "--official",
-        action="store_true",
-        help="use the stock MuJoCo viewer (mjpython) instead of mujoco-python-viewer",
     )
     args = parser.parse_args()
 
@@ -141,7 +132,7 @@ def main() -> None:
             print(f"  {name:>18}: {math.degrees(lo):+6.1f} .. {math.degrees(hi):+6.1f} deg")
         return
 
-    interactive_loop(model, data, step_fn=apply_ctrl, official=args.official)
+    interactive_loop(model, data, step_fn=apply_ctrl)
 
 
 if __name__ == "__main__":

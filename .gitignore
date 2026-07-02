@@ -4,3 +4,6 @@ __pycache__/
 .DS_Store
 out/
 MUJOCO_LOG.TXT
+web/node_modules/
+web/dist/
+web/public/sim-assets/

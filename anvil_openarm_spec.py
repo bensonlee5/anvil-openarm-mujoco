@@ -12,8 +12,6 @@ DEG = math.pi / 180.0
 
 MODEL_FILES = [
     "anvil_openarm_bimanual.xml",
-    "anvil_cell.xml",
-    "anvil_demo.xml",
     "anvil_pedestal.xml",
 ]
 

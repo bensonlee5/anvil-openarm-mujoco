@@ -112,23 +112,6 @@ FILES: dict[str, dict] = {
             ),
         ],
     },
-    "cell.xml": {
-        "out": "anvil_cell.xml",
-        "subs": [
-            literal(MESHDIR_OLD, MESHDIR_NEW),
-            literal('file="openarm_bimanual.xml"', 'file="anvil_openarm_bimanual.xml"'),
-        ],
-    },
-    "demo.xml": {
-        "out": "anvil_demo.xml",
-        "subs": [
-            literal(
-                '<mujoco model="openarm_bimanual cell demo">',
-                '<mujoco model="anvil_openarm_bimanual cell demo">',
-            ),
-            literal('file="cell.xml"', 'file="anvil_cell.xml"'),
-        ],
-    },
     "pedestal.xml": {
         "out": "anvil_pedestal.xml",
         "subs": [

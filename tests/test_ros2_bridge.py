@@ -3,7 +3,7 @@
 Require a ROS 2 environment (rclpy importable); skipped otherwise. Run them
 via the Docker harness on machines without ROS 2:
 
-    scripts/run_ros2_tests.sh
+    scripts/run_docker.sh ros-test
 """
 
 import math

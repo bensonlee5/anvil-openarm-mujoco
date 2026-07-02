@@ -13,8 +13,8 @@ implementation differences from Anvil's hardware stack.
 
 What's in this repo:
 
-- **MJCF models** of the Anvil OpenARM 2.0 (bimanual arm, pedestal, workcell,
-  and manipulation-demo scenes), derived from the upstream
+- **MJCF models** of the Anvil OpenARM 2.0 (bimanual arm and pedestal scenes),
+  derived from the upstream
   [enactic/openarm_mujoco](https://github.com/enactic/openarm_mujoco) v2 files
   (vendored as a git submodule) by a generator script that applies this repo's
   local Anvil joint-limit spec and TCP frames
@@ -29,48 +29,114 @@ What's in this repo:
   (run anywhere via the Docker harness)
 - **Viewer and demo scripts**, including a wrist range-of-motion sweep
 
+## Compatibility target
+
+This repo is meant to be a MuJoCo simulation backend for the **OpenArm v2 /
+Anvil OpenARM 2.0 robot shape and command interfaces**, with particular
+attention to Quest teleop compatibility. It is not a complete data-collection
+or policy-inference stack.
+
+| Concern | Status in this repo |
+|---|---|
+| OpenArm v2 physical model | **Yes, with Anvil deltas.** The generated MJCF starts from upstream OpenArm v2 assets and kinematics, then applies this repo's Anvil OpenARM 2.0 joint-limit/TCP changes. For stock OpenArm v2 limits, use the pristine `upstream/openarm_mujoco/v2` files or remove the Anvil patches. |
+| Quest teleop | **Interface-compatible target.** The ROS bridge subscribes to `/commanded_ee_left` and `/commanded_ee_right`, can auto-detect an installed custom `CommandedEEPose` type, consumes `header`, `pose`, and optional `gripper`, and maps those commands into the MuJoCo sim with local IK. |
+| Quest app / VR transport | **Not included.** This repo does not ship a Quest app, hand/controller tracking bridge, camera streaming, or data recording pipeline. It expects an external teleop publisher to provide the ROS topics. |
+| OpenArm v2 inference | **Not implemented.** There is no ACT/Diffusion Policy/GR00T/Pi-style policy runner, observation builder, camera stack, dataset writer, action server, or checkpoint loader here. External inference code can drive this sim through the joint-command or commanded-EE ROS topics, but this repo is not itself the inference runtime. |
+| OpenArm v2 loader configs | **Selectable metadata.** The hosted demo extracts the relevant profile fields from the `anvil-robotics/anvil-loader` submodule's `openarm_v2_*.yaml` files so each loader profile can be selected by URL/UI. These selections document the intended external control surface; they do not add the missing external runtimes. |
+| Hosted browser demo | **Visualization and joint-space teleop only.** The web viewer is useful for static hosted demos and keyboard/sliders, not Quest teleop or learned-policy inference. |
+
 ## Quick start
 
 ```bash
-git submodule update --init      # first checkout only
-uv sync                          # installs mujoco (incl. mjpython on macOS)
+git submodule update --init --recursive      # first checkout only
+uv sync                          # installs Python deps
 
 uv run python scripts/make_anvil_model.py   # regenerate models/ from upstream
 uv run python scripts/check_model.py        # validate against the Anvil spec
 
-uv run python scripts/view.py                          # demo scene in the viewer
+uv run python scripts/view.py                          # native desktop viewer on Linux
 uv run python scripts/view.py models/anvil_pedestal.xml
 uv run python scripts/demo_wrist_sweep.py              # wrist range-of-motion demo
 uv run python scripts/demo_wrist_sweep.py --headless   # same, no GUI, prints ranges
+
+npm --prefix web install                              # first web run only
+npm --prefix web run dev                              # hosted browser demos
 ```
 
-### Viewer on macOS
+### Hosted browser demos
 
-The stock MuJoCo viewer (`mjpython` / `_Simulate`) is currently buggy on this
-macOS setup. Re-tested with MuJoCo 3.10.0 + Python 3.13:
-
-```text
-RuntimeError: Caught an unknown exception!
-```
-
-The local scripts therefore default to
-[mujoco-python-viewer](https://github.com/rohanpsingh/mujoco-python-viewer) on
-macOS:
+The `web/` app is a static Vite/TypeScript viewer built on the official
+`@mujoco/mujoco` WASM package and Three.js. It exports the generated Anvil
+models into a Menagerie-style browser asset tree before dev/build:
 
 ```bash
-uv run python scripts/view.py models/anvil_pedestal.xml
-uv run python scripts/demo_wrist_sweep.py
+npm --prefix web run prepare:assets
+npm --prefix web run dev
+npm --prefix web run build
 ```
 
-Best practice when you want the official MuJoCo viewer from macOS is to run it
-inside the Linux viewer container and forward X11 through XQuartz:
+The splash page exposes the bimanual, pedestal, wrist-sweep, and full
+range-of-motion demos. The full-ROM demo sweeps every
+joint (J1–J7 and the gripper) through its complete Anvil range on both arms,
+one joint at a time; sweep feasibility on the showroom stage is pinned by
+`tests/test_web_scene.py`. The viewer renders a mujoco_anywhere-style
+environment: dark slate horizon and a mirror-blended checker floor that
+reflects the robot. It also exposes the OpenArm v2 loader profiles from
+`upstream/anvil_loader/config/openarm_v2_*.yaml`:
+
+- `?config=openarm_v2_inference`
+- `?config=openarm_v2_leader_follower_teleop`
+- `?config=openarm_v2_leader_only`
+- `?config=openarm_v2_quest_teleop`
+- `?config=openarm_v2_quest_teleop_commanded_ee`
+
+Combine a profile with a scene, for example
+`?demo=pedestal&config=openarm_v2_quest_teleop_commanded_ee`. Profile selection
+is metadata for the hosted viewer and docs: it highlights the intended external
+control surface but does not run the Quest app, leader hardware, or inference
+policy inside the browser.
+
+In a loaded demo, press `1`/`2` to select the left/right arm, use `Q/A` through
+`U/J` to jog J1..J7, and use `[`/`]` for the gripper. Targets are clamped to
+the MJCF actuator ranges and mirrored by the sliders.
+
+### Docker runtime
+
+Docker is the reproducible path for repo checks, browser builds, ROS tests, and
+the official MuJoCo desktop viewer from macOS:
+
+```bash
+scripts/run_docker.sh build all              # one-time; reuses existing images
+scripts/run_docker.sh check
+scripts/run_docker.sh test
+scripts/run_docker.sh wrist-headless
+scripts/run_docker.sh web-build
+scripts/run_docker.sh viewer-smoke
+scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0
+scripts/run_docker.sh ros-test
+```
+
+Run commands reuse the tagged images by default and mount the current checkout,
+so code changes do not require rebuilding the images. Use
+`scripts/run_docker.sh rebuild all` or `ANVIL_DOCKER_REBUILD=1` when the
+Dockerfile, Python deps, Node deps, ROS base, or submodule layout changes.
+
+For browser development in Docker:
+
+```bash
+scripts/run_docker.sh web-dev
+```
+
+The native Python viewer uses the official MuJoCo viewer and is intended for
+Linux desktops. On macOS, use the hosted browser demo or run the official viewer
+inside the Linux container with XQuartz:
 
 ```bash
 # one-time: install XQuartz, enable "Allow connections from network clients",
 # then restart XQuartz
 open -a XQuartz
 xhost + 127.0.0.1
-scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+scripts/run_docker.sh viewer models/anvil_pedestal.xml
 xhost - 127.0.0.1
 ```
 
@@ -78,22 +144,15 @@ For Linux desktops:
 
 ```bash
 xhost +local:docker
-scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+scripts/run_docker.sh viewer models/anvil_pedestal.xml
 xhost -local:docker
 ```
 
 To validate the container without a visible display:
 
 ```bash
-scripts/run_viewer_docker.sh --smoke
+scripts/run_docker.sh viewer-smoke
 ```
-
-Pass `--official` to `view.py` / `demo_wrist_sweep.py` only when explicitly
-re-testing the local stock viewer after MuJoCo updates. `scripts/common.py`
-also self-heals the known
-[mjpython-under-uv dlopen issue](https://github.com/google-deepmind/mujoco/issues/1923)
-by symlinking `libpython` into `.venv/lib`, but that is separate from the
-current `_Simulate` crash.
 
 ## Models
 
@@ -101,8 +160,6 @@ current `_Simulate` crash.
 |---|---|
 | `models/anvil_openarm_bimanual.xml` | the bimanual arm + grippers, no scene |
 | `models/anvil_pedestal.xml` | arm on a pedestal with floor and lighting |
-| `models/anvil_cell.xml` | arm in the OpenArm workcell (lifter, sheet, walls) |
-| `models/anvil_demo.xml` | workcell + manipulable props (cube, tray) |
 
 All are **generated files** — edit `scripts/make_anvil_model.py` (or upstream)
 and regenerate rather than editing them directly.
@@ -154,6 +211,8 @@ at left +q exactly equals right -q).
 
 ```
 upstream/openarm_mujoco/   git submodule: enactic/openarm_mujoco (pristine)
+upstream/anvil_loader/     git submodule: anvil-robotics/anvil-loader;
+                           OpenArm v2 runtime profile YAML source
 anvil_openarm_spec.py      shared local spec constants used by generation,
                            validation, tests, and the sim bridge
 models/                    generated Anvil-variant MJCF (meshes referenced
@@ -175,15 +234,13 @@ scripts/
   view.py                  open a model in an interactive viewer
   demo_wrist_sweep.py      sweep both wrists through the Anvil ranges
                            (elbows raised; J6 sweep, J7 sweep, wrist circles)
-  run_ros2_tests.sh        dockerized ROS 2 integration test suite
-  run_viewer_docker.sh     dockerized Linux/X11 official MuJoCo viewer
-  common.py                viewer selection + mjpython workarounds
+  run_docker.sh            split Docker workflow for checks, web, viewer, ROS
+  common.py                official MuJoCo viewer helper
 tests/
   test_sim_core.py         unit tests, no ROS required
   test_ros2_bridge.py      bridge integration tests (auto-skip without rclpy)
 docker/
-  Dockerfile.ros2-test     ROS 2 Jazzy image that runs the full test suite
-  Dockerfile.viewer        Linux viewer image with MuJoCo + X11/Xvfb deps
+  Dockerfile               multi-target Python, web, viewer, and ROS images
 ```
 
 ### Updating upstream
@@ -243,9 +300,25 @@ Two deliberate differences from raw hardware:
   behavior level, but it is not Anvil's hardware IK engine and does not run TF
   transforms or reproduce the full controller stack.
 
+### Inference integration status
+
+This repo intentionally stops at the simulation and ROS command surface. It can
+serve as a target for an external OpenArm v2 inference process if that process
+publishes either:
+
+- joint commands to `/follower_{l,r}_forward_position_controller/commands`, or
+- Cartesian TCP commands to `/commanded_ee_{left,right}`.
+
+It does **not** provide the inference process itself: no learned-policy model,
+camera observation pipeline, dataset schema, action normalization layer, or
+policy-specific controller is included. Those should live in a separate
+training/inference repo or be added here as an explicit new subsystem once the
+desired OpenArm v2 inference interface is pinned down.
+
 Run it on a machine with ROS 2 (Jazzy or newer) and this repo checked out:
 
 ```bash
+source /opt/ros/jazzy/setup.bash
 pip install mujoco numpy          # alongside your ROS 2 python env
 python3 -m bridge.ros2_bridge --ros-args -p time_scale:=1.0
 # then, from another shell:
@@ -256,8 +329,22 @@ ros2 topic pub --once /commanded_ee_left geometry_msgs/msg/PoseStamped \
   "{header: {frame_id: world}, pose: {position: {x: 0.35, y: 0.2, z: 0.2}, orientation: {w: 1.0}}}"
 ```
 
-macOS has no native ROS 2; use the Docker harness below (tests) or run the
-bridge inside your own ROS 2 container/VM with the repo mounted.
+If `python3 -m bridge.ros2_bridge` fails with `No module named 'rclpy'`, that
+shell is not a sourced ROS 2 environment. `rclpy` is provided by ROS 2; it is
+not installed by `uv sync` or the browser-demo workflow.
+
+macOS has no native ROS 2. Use the hosted browser demo for local visual work,
+run the bridge on the robot/devbox or another Linux ROS 2 machine, or use the
+Docker harness:
+
+```bash
+scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0
+```
+
+On Linux, the Docker bridge uses host networking so other ROS 2 processes on
+the host can discover it. On Docker Desktop for macOS, DDS discovery across the
+host/container boundary is limited; use this mainly for local bridge execution
+or run all ROS clients in the same Linux/container environment.
 
 ## Testing
 
@@ -271,15 +358,14 @@ behavior, ROS topics, Quest teleop, and eventual hardware comparison is in
 |---|---|---|
 | Model spec validation (joint/actuator ranges, TCP sites, keyframes, 2000-step stability) | `uv run python scripts/check_model.py` | nothing extra |
 | Sim-core unit tests (command order, clamping, TCP pose, SDLS boundedness, velocity caps, nullspace bias, generation reproducibility) | `uv run pytest` | nothing extra (ROS tests auto-skip) |
-| ROS 2 bridge integration tests (topics publish, joint and commanded-EE commands move the arm, limits clamp, malformed commands rejected) | `scripts/run_ros2_tests.sh` | Docker |
-| Official MuJoCo viewer container smoke test | `scripts/run_viewer_docker.sh --smoke` | Docker |
+| ROS 2 bridge runtime in Docker | `scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0` | Docker |
+| ROS 2 bridge integration tests (topics publish, joint and commanded-EE commands move the arm, limits clamp, malformed commands rejected) | `scripts/run_docker.sh ros-test` | Docker |
+| Official MuJoCo viewer container smoke test | `scripts/run_docker.sh viewer-smoke` | Docker |
 | Wrist range-of-motion evidence (both arms achieve J6 −45°..+70°, J7 ±90° under position control) | `uv run python scripts/demo_wrist_sweep.py --headless` | nothing extra |
 | Eyeball QA | `uv run python scripts/view.py`, `uv run python scripts/demo_wrist_sweep.py` | display |
 
-The Docker suite builds a ROS 2 Jazzy image, installs MuJoCo alongside the
-apt rclpy stack, and runs **all** tests (the sim-core tests run twice: once
-locally via uv, once inside the container — cheap and catches
-python-version drift).
+The Docker suite builds focused targets for Python checks, the hosted web demo,
+the official MuJoCo viewer, and ROS 2 Jazzy integration tests.
 
 ### On the real robot
 
@@ -342,9 +428,6 @@ programmatic control
   MuJoCo model and only interprets targets in `world`. It is intended to mimic
   Anvil's documented behavior at a high level, not to reproduce Anvil's custom
   implementation exactly.
-- `anvil_demo.xml` inherits an upstream quirk: the demo attaches the cell
-  model without pinning `timestep`, so MuJoCo warns and runs at 2 ms instead
-  of the cell's 1 ms.
 
 ## Sources
 
