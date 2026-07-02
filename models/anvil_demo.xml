@@ -23,6 +23,7 @@ limitations under the License.
 -->
 
 <mujoco model="anvil_openarm_bimanual cell demo">
+  <option timestep="0.001" />
   <visual>
     <global offwidth="960" offheight="600"/>
   </visual>

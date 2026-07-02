@@ -18,6 +18,12 @@ uv sync
 macOS does not provide a native ROS 2 environment. Run ROS tests through Docker
 or use a Linux ROS 2 environment with this repo mounted.
 
+The Docker entrypoint is:
+
+```bash
+scripts/run_docker.sh --help
+```
+
 ## Full Local Gate
 
 Run this before relying on the model:
@@ -32,8 +38,9 @@ git diff --check
 If Docker is available, also run:
 
 ```bash
-scripts/run_viewer_docker.sh --smoke
-scripts/run_ros2_tests.sh
+scripts/run_docker.sh web-build
+scripts/run_docker.sh viewer-smoke
+scripts/run_docker.sh ros-test
 ```
 
 Expected result:
@@ -44,6 +51,7 @@ Expected result:
 - `pytest` passes locally, with ROS tests skipped if `rclpy` is unavailable.
 - The wrist sweep reaches approximately J6 -45..+70 degrees and J7 +/-90
   degrees.
+- The web build exports hosted assets and builds the Vite app.
 - The viewer smoke test builds the Linux viewer image and keeps the official
   MuJoCo viewer alive under Xvfb until the expected timeout.
 - The Docker suite passes all ROS 2 bridge tests.
@@ -92,7 +100,7 @@ control. It is not Anvil's closed hardware IK implementation.
 Run the Docker suite:
 
 ```bash
-scripts/run_ros2_tests.sh
+scripts/run_docker.sh ros-test
 ```
 
 This builds a ROS 2 Jazzy image, installs MuJoCo and pytest, then runs all
@@ -107,30 +115,25 @@ tests in a ROS environment. The bridge tests verify:
 
 ## Viewer Tests
 
-The official MuJoCo viewer currently crashes on this macOS setup with:
-
-```text
-RuntimeError: Caught an unknown exception!
-```
-
-Reproduce the local official-viewer failure with:
-
-```bash
-uv run python scripts/view.py --official models/anvil_pedestal.xml
-```
-
-For normal local macOS viewing, use the default fallback:
+The native Python viewer uses the official MuJoCo viewer and is intended for
+Linux desktops:
 
 ```bash
 uv run python scripts/view.py models/anvil_pedestal.xml
 uv run python scripts/demo_wrist_sweep.py
 ```
 
-For the official MuJoCo viewer, use the Linux viewer container. Headless smoke
-test:
+On macOS, use the hosted browser demo for normal visual work:
 
 ```bash
-scripts/run_viewer_docker.sh --smoke
+npm --prefix web run dev
+```
+
+For the official desktop viewer on macOS, use the Linux viewer container with
+XQuartz. Headless smoke test:
+
+```bash
+scripts/run_docker.sh viewer-smoke
 ```
 
 Interactive macOS/XQuartz flow:
@@ -138,7 +141,7 @@ Interactive macOS/XQuartz flow:
 ```bash
 open -a XQuartz
 xhost + 127.0.0.1
-scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+scripts/run_docker.sh viewer models/anvil_pedestal.xml
 xhost - 127.0.0.1
 ```
 
@@ -146,7 +149,7 @@ Interactive Linux/X11 flow:
 
 ```bash
 xhost +local:docker
-scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+scripts/run_docker.sh viewer models/anvil_pedestal.xml
 xhost -local:docker
 ```
 
@@ -244,7 +247,7 @@ Once the physical robot arrives, validate sim parity conservatively:
 ## Troubleshooting
 
 - If `uv run pytest -q` skips ROS tests, that is expected outside a ROS 2
-  Python environment. Use `scripts/run_ros2_tests.sh`.
+  Python environment. Use `scripts/run_docker.sh ros-test`.
 - If `commanded_ee_msg_type:=auto` does not subscribe, start the Quest teleop
   publisher first or pass the exact message type from `ros2 topic type`.
 - If commanded-EE motion appears slow for far targets, that is the velocity cap

@@ -1,6 +1,13 @@
 .git
 .venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
 out
 __pycache__
 **/__pycache__
+*.pyc
 MUJOCO_LOG.TXT
+web/node_modules
+web/dist
+web/public/sim-assets

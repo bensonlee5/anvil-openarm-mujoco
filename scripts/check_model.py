@@ -16,6 +16,8 @@ the upstream OpenArm v2 pinch-gripper grasp frame. Everything else must remain
 identical to upstream. Exits non-zero on any violation.
 """
 
+import contextlib
+import io
 import sys
 from pathlib import Path
 
@@ -53,6 +55,25 @@ def fail(msg: str) -> None:
 
 def ok(msg: str) -> None:
     print(f"  ok    {msg}")
+
+
+def compile_model(path: Path, tag: str) -> mujoco.MjModel | None:
+    compile_stderr = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(compile_stderr):
+            model = mujoco.MjModel.from_xml_path(str(path))
+    except Exception as exc:  # noqa: BLE001 - report and continue
+        fail(f"{tag}: failed to compile: {exc}")
+        return None
+
+    warning_text = " ".join(
+        line.strip() for line in compile_stderr.getvalue().splitlines() if line.strip()
+    )
+    if warning_text:
+        fail(f"{tag}: compile emitted warning(s): {warning_text}")
+        return None
+
+    return model
 
 
 def approx(a: float, b: float) -> bool:
@@ -220,10 +241,8 @@ def main() -> int:
         if not path.is_file():
             fail(f"missing file {path}")
             continue
-        try:
-            model = mujoco.MjModel.from_xml_path(str(path))
-        except Exception as exc:  # noqa: BLE001 - report and continue
-            fail(f"{fname}: failed to compile: {exc}")
+        model = compile_model(path, fname)
+        if model is None:
             continue
         ok(f"compiles ({model.njnt} joints, {model.nu} actuators)")
         check_joint_ranges(model, fname)

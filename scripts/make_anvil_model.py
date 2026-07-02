@@ -124,7 +124,8 @@ FILES: dict[str, dict] = {
         "subs": [
             literal(
                 '<mujoco model="openarm_bimanual cell demo">',
-                '<mujoco model="anvil_openarm_bimanual cell demo">',
+                '<mujoco model="anvil_openarm_bimanual cell demo">\n'
+                '  <option timestep="0.001" />',
             ),
             literal('file="cell.xml"', 'file="anvil_cell.xml"'),
         ],
