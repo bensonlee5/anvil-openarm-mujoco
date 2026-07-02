@@ -32,6 +32,7 @@ git diff --check
 If Docker is available, also run:
 
 ```bash
+scripts/run_viewer_docker.sh --smoke
 scripts/run_ros2_tests.sh
 ```
 
@@ -43,6 +44,8 @@ Expected result:
 - `pytest` passes locally, with ROS tests skipped if `rclpy` is unavailable.
 - The wrist sweep reaches approximately J6 -45..+70 degrees and J7 +/-90
   degrees.
+- The viewer smoke test builds the Linux viewer image and keeps the official
+  MuJoCo viewer alive under Xvfb until the expected timeout.
 - The Docker suite passes all ROS 2 bridge tests.
 
 ## Generated Model Reproducibility
@@ -101,6 +104,55 @@ tests in a ROS environment. The bridge tests verify:
 - `/commanded_ee_left` accepts the default `geometry_msgs/PoseStamped` shim and
   moves the TCP closer to a small target.
 - Malformed joint commands are rejected without stopping publication.
+
+## Viewer Tests
+
+The official MuJoCo viewer currently crashes on this macOS setup with:
+
+```text
+RuntimeError: Caught an unknown exception!
+```
+
+Reproduce the local official-viewer failure with:
+
+```bash
+uv run python scripts/view.py --official models/anvil_pedestal.xml
+```
+
+For normal local macOS viewing, use the default fallback:
+
+```bash
+uv run python scripts/view.py models/anvil_pedestal.xml
+uv run python scripts/demo_wrist_sweep.py
+```
+
+For the official MuJoCo viewer, use the Linux viewer container. Headless smoke
+test:
+
+```bash
+scripts/run_viewer_docker.sh --smoke
+```
+
+Interactive macOS/XQuartz flow:
+
+```bash
+open -a XQuartz
+xhost + 127.0.0.1
+scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+xhost - 127.0.0.1
+```
+
+Interactive Linux/X11 flow:
+
+```bash
+xhost +local:docker
+scripts/run_viewer_docker.sh models/anvil_pedestal.xml
+xhost -local:docker
+```
+
+The smoke test runs the official viewer under Xvfb with a timeout. A timeout is
+treated as success because it means the interactive viewer stayed alive instead
+of failing during startup.
 
 ## Manual ROS 2 Smoke Test
 
