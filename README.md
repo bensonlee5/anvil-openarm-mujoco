@@ -29,10 +29,26 @@ What's in this repo:
   (run anywhere via the Docker harness)
 - **Viewer and demo scripts**, including a wrist range-of-motion sweep
 
+## Compatibility target
+
+This repo is meant to be a MuJoCo simulation backend for the **OpenArm v2 /
+Anvil OpenARM 2.0 robot shape and command interfaces**, with particular
+attention to Quest teleop compatibility. It is not a complete data-collection
+or policy-inference stack.
+
+| Concern | Status in this repo |
+|---|---|
+| OpenArm v2 physical model | **Yes, with Anvil deltas.** The generated MJCF starts from upstream OpenArm v2 assets and kinematics, then applies this repo's Anvil OpenARM 2.0 joint-limit/TCP changes. For stock OpenArm v2 limits, use the pristine `upstream/openarm_mujoco/v2` files or remove the Anvil patches. |
+| Quest teleop | **Interface-compatible target.** The ROS bridge subscribes to `/commanded_ee_left` and `/commanded_ee_right`, can auto-detect an installed custom `CommandedEEPose` type, consumes `header`, `pose`, and optional `gripper`, and maps those commands into the MuJoCo sim with local IK. |
+| Quest app / VR transport | **Not included.** This repo does not ship a Quest app, hand/controller tracking bridge, camera streaming, or data recording pipeline. It expects an external teleop publisher to provide the ROS topics. |
+| OpenArm v2 inference | **Not implemented.** There is no ACT/Diffusion Policy/GR00T/Pi-style policy runner, observation builder, camera stack, dataset writer, action server, or checkpoint loader here. External inference code can drive this sim through the joint-command or commanded-EE ROS topics, but this repo is not itself the inference runtime. |
+| OpenArm v2 loader configs | **Selectable metadata.** The hosted demo extracts the relevant profile fields from the `anvil-robotics/anvil-loader` submodule's `openarm_v2_*.yaml` files so each loader profile can be selected by URL/UI. These selections document the intended external control surface; they do not add the missing external runtimes. |
+| Hosted browser demo | **Visualization and joint-space teleop only.** The web viewer is useful for static hosted demos and keyboard/sliders, not Quest teleop or learned-policy inference. |
+
 ## Quick start
 
 ```bash
-git submodule update --init      # first checkout only
+git submodule update --init --recursive      # first checkout only
 uv sync                          # installs Python deps
 
 uv run python scripts/make_anvil_model.py   # regenerate models/ from upstream
@@ -60,9 +76,24 @@ npm --prefix web run build
 ```
 
 The splash page exposes the bimanual, pedestal, workcell, manipulation, and
-wrist-sweep demos. In a loaded demo, press `1`/`2` to select the left/right arm,
-use `Q/A` through `U/J` to jog J1..J7, and use `[`/`]` for the gripper. Targets
-are clamped to the MJCF actuator ranges and mirrored by the sliders.
+wrist-sweep demos. It also exposes the OpenArm v2 loader profiles from
+`upstream/anvil_loader/config/openarm_v2_*.yaml`:
+
+- `?config=openarm_v2_inference`
+- `?config=openarm_v2_leader_follower_teleop`
+- `?config=openarm_v2_leader_only`
+- `?config=openarm_v2_quest_teleop`
+- `?config=openarm_v2_quest_teleop_commanded_ee`
+
+Combine a profile with a scene, for example
+`?demo=pedestal&config=openarm_v2_quest_teleop_commanded_ee`. Profile selection
+is metadata for the hosted viewer and docs: it highlights the intended external
+control surface but does not run the Quest app, leader hardware, or inference
+policy inside the browser.
+
+In a loaded demo, press `1`/`2` to select the left/right arm, use `Q/A` through
+`U/J` to jog J1..J7, and use `[`/`]` for the gripper. Targets are clamped to
+the MJCF actuator ranges and mirrored by the sliders.
 
 ### Docker runtime
 
@@ -70,13 +101,20 @@ Docker is the reproducible path for repo checks, browser builds, ROS tests, and
 the official MuJoCo desktop viewer from macOS:
 
 ```bash
+scripts/run_docker.sh build all              # one-time; reuses existing images
 scripts/run_docker.sh check
 scripts/run_docker.sh test
 scripts/run_docker.sh wrist-headless
 scripts/run_docker.sh web-build
 scripts/run_docker.sh viewer-smoke
+scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0
 scripts/run_docker.sh ros-test
 ```
+
+Run commands reuse the tagged images by default and mount the current checkout,
+so code changes do not require rebuilding the images. Use
+`scripts/run_docker.sh rebuild all` or `ANVIL_DOCKER_REBUILD=1` when the
+Dockerfile, Python deps, Node deps, ROS base, or submodule layout changes.
 
 For browser development in Docker:
 
@@ -170,6 +208,8 @@ at left +q exactly equals right -q).
 
 ```
 upstream/openarm_mujoco/   git submodule: enactic/openarm_mujoco (pristine)
+upstream/anvil_loader/     git submodule: anvil-robotics/anvil-loader;
+                           OpenArm v2 runtime profile YAML source
 anvil_openarm_spec.py      shared local spec constants used by generation,
                            validation, tests, and the sim bridge
 models/                    generated Anvil-variant MJCF (meshes referenced
@@ -257,9 +297,25 @@ Two deliberate differences from raw hardware:
   behavior level, but it is not Anvil's hardware IK engine and does not run TF
   transforms or reproduce the full controller stack.
 
+### Inference integration status
+
+This repo intentionally stops at the simulation and ROS command surface. It can
+serve as a target for an external OpenArm v2 inference process if that process
+publishes either:
+
+- joint commands to `/follower_{l,r}_forward_position_controller/commands`, or
+- Cartesian TCP commands to `/commanded_ee_{left,right}`.
+
+It does **not** provide the inference process itself: no learned-policy model,
+camera observation pipeline, dataset schema, action normalization layer, or
+policy-specific controller is included. Those should live in a separate
+training/inference repo or be added here as an explicit new subsystem once the
+desired OpenArm v2 inference interface is pinned down.
+
 Run it on a machine with ROS 2 (Jazzy or newer) and this repo checked out:
 
 ```bash
+source /opt/ros/jazzy/setup.bash
 pip install mujoco numpy          # alongside your ROS 2 python env
 python3 -m bridge.ros2_bridge --ros-args -p time_scale:=1.0
 # then, from another shell:
@@ -270,8 +326,22 @@ ros2 topic pub --once /commanded_ee_left geometry_msgs/msg/PoseStamped \
   "{header: {frame_id: world}, pose: {position: {x: 0.35, y: 0.2, z: 0.2}, orientation: {w: 1.0}}}"
 ```
 
-macOS has no native ROS 2; use the Docker harness below (tests) or run the
-bridge inside your own ROS 2 container/VM with the repo mounted.
+If `python3 -m bridge.ros2_bridge` fails with `No module named 'rclpy'`, that
+shell is not a sourced ROS 2 environment. `rclpy` is provided by ROS 2; it is
+not installed by `uv sync` or the browser-demo workflow.
+
+macOS has no native ROS 2. Use the hosted browser demo for local visual work,
+run the bridge on the robot/devbox or another Linux ROS 2 machine, or use the
+Docker harness:
+
+```bash
+scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0
+```
+
+On Linux, the Docker bridge uses host networking so other ROS 2 processes on
+the host can discover it. On Docker Desktop for macOS, DDS discovery across the
+host/container boundary is limited; use this mainly for local bridge execution
+or run all ROS clients in the same Linux/container environment.
 
 ## Testing
 
@@ -285,6 +355,7 @@ behavior, ROS topics, Quest teleop, and eventual hardware comparison is in
 |---|---|---|
 | Model spec validation (joint/actuator ranges, TCP sites, keyframes, 2000-step stability) | `uv run python scripts/check_model.py` | nothing extra |
 | Sim-core unit tests (command order, clamping, TCP pose, SDLS boundedness, velocity caps, nullspace bias, generation reproducibility) | `uv run pytest` | nothing extra (ROS tests auto-skip) |
+| ROS 2 bridge runtime in Docker | `scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0` | Docker |
 | ROS 2 bridge integration tests (topics publish, joint and commanded-EE commands move the arm, limits clamp, malformed commands rejected) | `scripts/run_docker.sh ros-test` | Docker |
 | Official MuJoCo viewer container smoke test | `scripts/run_docker.sh viewer-smoke` | Docker |
 | Wrist range-of-motion evidence (both arms achieve J6 −45°..+70°, J7 ±90° under position control) | `uv run python scripts/demo_wrist_sweep.py --headless` | nothing extra |

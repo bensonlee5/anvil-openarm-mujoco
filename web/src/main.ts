@@ -1,6 +1,13 @@
 import "./styles.css";
 
 import { DEMOS, getDemo, type DemoDefinition } from "./demos";
+import {
+  describeCommandSurface,
+  getSelectedLoaderProfile,
+  loadLoaderProfiles,
+  type LoaderProfile,
+  type LoaderProfilePayload,
+} from "./loaderProfiles";
 import { ViewerApp } from "./simulator";
 
 const queriedRoot = document.querySelector<HTMLDivElement>("#app");
@@ -10,8 +17,12 @@ if (!queriedRoot) {
 const appRoot: HTMLDivElement = queriedRoot;
 
 let activeViewer: ViewerApp | undefined;
+let routeGeneration = 0;
 
-function renderSplash(): void {
+function renderSplash(
+  loaderProfiles: LoaderProfilePayload,
+  selectedProfile: LoaderProfile | undefined,
+): void {
   activeViewer?.dispose();
   activeViewer = undefined;
 
@@ -29,7 +40,7 @@ function renderSplash(): void {
       </div>
       <h1>Hosted robot demos</h1>
       <p class="splash__copy">
-        Select a browser-based MuJoCo scene, then operate either arm with joint-space keyboard teleop or the actuator sliders.
+        Select an OpenArm v2 loader profile and browser-based MuJoCo scene, then operate either arm with joint-space keyboard teleop or the actuator sliders.
       </p>
     </div>
     <figure class="splash__media">
@@ -39,6 +50,10 @@ function renderSplash(): void {
 
   const demos = document.createElement("section");
   demos.className = "splash__demos";
+
+  const configPicker = createConfigPicker(loaderProfiles, selectedProfile);
+  demos.append(configPicker);
+
   const grid = document.createElement("div");
   grid.className = "demo-grid";
   for (const demo of DEMOS) {
@@ -54,8 +69,9 @@ function renderSplash(): void {
       <span class="demo-card__launch">Open demo</span>
     `;
     button.addEventListener("click", () => {
-      history.pushState({}, "", `?demo=${demo.id}`);
-      void openDemo(demo);
+      const configId = currentConfigId();
+      history.pushState({}, "", buildUrl(demo.id, configId));
+      void openDemo(demo, profileById(loaderProfiles.profiles, configId));
     });
     grid.append(button);
   }
@@ -64,14 +80,86 @@ function renderSplash(): void {
   appRoot.append(splash);
 }
 
-async function openDemo(demo: DemoDefinition): Promise<void> {
+function createConfigPicker(
+  loaderProfiles: LoaderProfilePayload,
+  selectedProfile: LoaderProfile | undefined,
+): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "loader-config";
+
+  const header = document.createElement("div");
+  header.className = "loader-config__header";
+  header.innerHTML = `
+    <div>
+      <div class="loader-config__eyebrow">OpenArm v2 config</div>
+      <h2>Runtime profile</h2>
+    </div>
+  `;
+
+  const details = document.createElement("div");
+  details.className = "loader-config__details";
+
+  if (loaderProfiles.profiles.length === 0) {
+    details.textContent =
+      "No loader profiles found. Run npm run prepare:assets after initializing upstream/anvil_loader.";
+    section.append(header, details);
+    return section;
+  }
+
+  const select = document.createElement("select");
+  select.id = "loader-profile";
+  select.className = "loader-config__select";
+  select.setAttribute("aria-label", "OpenArm v2 loader profile");
+  for (const profile of loaderProfiles.profiles) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.title;
+    select.append(option);
+  }
+  if (selectedProfile) {
+    select.value = selectedProfile.id;
+  }
+
+  header.append(select);
+  section.append(header, details);
+
+  const updateDetails = (profile: LoaderProfile | undefined): void => {
+    if (!profile) {
+      details.textContent = "";
+      return;
+    }
+    details.innerHTML = `
+      <p>${escapeHtml(profile.summary)}</p>
+      <dl>
+        <div><dt>YAML</dt><dd><a href="${profile.sourceUrl}" target="_blank" rel="noreferrer">${profile.filename}</a></dd></div>
+        <div><dt>Mode</dt><dd>${escapeHtml(profile.controlMode)}</dd></div>
+        <div><dt>Surface</dt><dd>${escapeHtml(describeCommandSurface(profile))}</dd></div>
+        <div><dt>Arms</dt><dd>${escapeHtml(formatArms(profile))}</dd></div>
+      </dl>
+      <p class="loader-config__support">${escapeHtml(profile.repoSupport)}</p>
+    `;
+  };
+
+  select.addEventListener("change", () => {
+    const profile = profileById(loaderProfiles.profiles, select.value);
+    history.replaceState({}, "", buildUrl(undefined, profile?.id));
+    updateDetails(profile);
+  });
+  updateDetails(selectedProfile ?? loaderProfiles.profiles[0]);
+  return section;
+}
+
+async function openDemo(
+  demo: DemoDefinition,
+  loaderProfile: LoaderProfile | undefined,
+): Promise<void> {
   activeViewer?.dispose();
   activeViewer = undefined;
-  renderLoading(demo);
+  renderLoading(demo, loaderProfile);
   try {
-    activeViewer = await ViewerApp.create(appRoot, demo, () => {
-      history.pushState({}, "", window.location.pathname);
-      renderSplash();
+    activeViewer = await ViewerApp.create(appRoot, demo, loaderProfile, () => {
+      history.pushState({}, "", buildUrl(undefined, loaderProfile?.id));
+      void route();
     });
   } catch (error) {
     console.error(error);
@@ -79,12 +167,15 @@ async function openDemo(demo: DemoDefinition): Promise<void> {
   }
 }
 
-function renderLoading(demo: DemoDefinition): void {
+function renderLoading(
+  demo: DemoDefinition,
+  loaderProfile: LoaderProfile | undefined,
+): void {
   appRoot.innerHTML = `
     <div class="loading">
       <div class="loading__box">
         <h1>Loading ${demo.title}</h1>
-        <p>Preparing MuJoCo WASM, model XML, and mesh assets.</p>
+        <p>Preparing MuJoCo WASM, model XML, mesh assets, and ${loaderProfile?.title ?? "OpenArm v2"} profile metadata.</p>
       </div>
     </div>
   `;
@@ -102,15 +193,78 @@ function renderError(demo: DemoDefinition, error: unknown): void {
   `;
 }
 
-function route(): void {
+async function route(): Promise<void> {
+  const generation = ++routeGeneration;
+  const loaderProfiles = await loadLoaderProfiles();
+  if (generation !== routeGeneration) {
+    return;
+  }
   const params = new URLSearchParams(window.location.search);
+  const profile = getSelectedLoaderProfile(
+    loaderProfiles.profiles,
+    params.get("config"),
+  );
   const demo = getDemo(params.get("demo"));
   if (demo) {
-    void openDemo(demo);
+    void openDemo(demo, profile);
   } else {
-    renderSplash();
+    renderSplash(loaderProfiles, profile);
   }
 }
 
-window.addEventListener("popstate", route);
-route();
+function currentConfigId(): string | undefined {
+  return document.querySelector<HTMLSelectElement>("#loader-profile")?.value;
+}
+
+function profileById(
+  profiles: LoaderProfile[],
+  id: string | undefined,
+): LoaderProfile | undefined {
+  return profiles.find((profile) => profile.id === id);
+}
+
+function buildUrl(demoId: string | undefined, configId: string | undefined): string {
+  const params = new URLSearchParams();
+  if (demoId) {
+    params.set("demo", demoId);
+  }
+  if (configId) {
+    params.set("config", configId);
+  }
+  const query = params.toString();
+  return query ? `${window.location.pathname}?${query}` : window.location.pathname;
+}
+
+function formatArms(profile: LoaderProfile): string {
+  return profile.arms
+    .map((arm) => {
+      const extras = [
+        arm.canInterfaceName ? `CAN ${arm.canInterfaceName}` : "",
+        arm.vrController ? `VR ${arm.vrController}` : "",
+      ].filter(Boolean);
+      return extras.length ? `${arm.name} (${extras.join(", ")})` : arm.name;
+    })
+    .join(", ");
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#039;";
+    }
+  });
+}
+
+window.addEventListener("popstate", () => {
+  void route();
+});
+void route();

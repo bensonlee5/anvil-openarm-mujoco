@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import type { DemoDefinition } from "./demos";
+import { describeCommandSurface, type LoaderProfile } from "./loaderProfiles";
 import { getMujoco, prepareAssets, WORKING_ROOT } from "./mujocoAssets";
 import type { MainModule, MjData, MjModel } from "@mujoco/mujoco";
 
@@ -51,9 +52,26 @@ const clamp = (value: number, min: number, max: number): number =>
 
 const radToDeg = (value: number): number => (value * 180) / Math.PI;
 
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#039;";
+    }
+  });
+
 export class ViewerApp {
   private readonly root: HTMLElement;
   private readonly demo: DemoDefinition;
+  private readonly loaderProfile: LoaderProfile | undefined;
   private readonly onExit: () => void;
   private readonly stage: HTMLDivElement;
   private readonly panel: HTMLElement;
@@ -86,16 +104,23 @@ export class ViewerApp {
   static async create(
     root: HTMLElement,
     demo: DemoDefinition,
+    loaderProfile: LoaderProfile | undefined,
     onExit: () => void,
   ): Promise<ViewerApp> {
-    const app = new ViewerApp(root, demo, onExit);
+    const app = new ViewerApp(root, demo, loaderProfile, onExit);
     await app.init();
     return app;
   }
 
-  private constructor(root: HTMLElement, demo: DemoDefinition, onExit: () => void) {
+  private constructor(
+    root: HTMLElement,
+    demo: DemoDefinition,
+    loaderProfile: LoaderProfile | undefined,
+    onExit: () => void,
+  ) {
     this.root = root;
     this.demo = demo;
+    this.loaderProfile = loaderProfile;
     this.onExit = onExit;
 
     this.root.innerHTML = "";
@@ -307,6 +332,17 @@ export class ViewerApp {
         </div>
         <button class="icon-button" data-action="exit" aria-label="Back to demos" title="Back to demos">x</button>
       </div>
+      ${this.loaderProfile ? `
+        <div class="profile-summary">
+          <div class="profile-summary__eyebrow">OpenArm v2 config</div>
+          <h2>${escapeHtml(this.loaderProfile.title)}</h2>
+          <p>${escapeHtml(this.loaderProfile.filename)}</p>
+          <dl>
+            <div><dt>Surface</dt><dd>${escapeHtml(describeCommandSurface(this.loaderProfile))}</dd></div>
+            <div><dt>Mode</dt><dd>${escapeHtml(this.loaderProfile.controlMode)}</dd></div>
+          </dl>
+        </div>
+      ` : ""}
       <div class="segment" aria-label="Arm selection">
         <button data-side="left" aria-pressed="true">Left</button>
         <button data-side="right" aria-pressed="false">Right</button>
@@ -413,12 +449,16 @@ export class ViewerApp {
   private updateHud(): void {
     this.hud.innerHTML = `
       <div class="hud__pill">${this.demo.title}</div>
+      ${this.loaderProfile ? `<div class="hud__pill">${escapeHtml(this.loaderProfile.title)}</div>` : ""}
       <div class="hud__pill">${SIDE_LABEL[this.activeSide]}</div>
       <div class="hud__pill">${this.paused ? "Paused" : `${this.data?.time.toFixed(2) ?? "0.00"}s`}</div>
     `;
     const status = this.panel.querySelector<HTMLDivElement>("[data-status]");
     if (status) {
-      status.textContent = `${SIDE_LABEL[this.activeSide]} selected. ${this.demo.script === "wristSweep" ? "Wrist sweep is driving J6/J7." : "Keyboard and sliders drive joint-space targets."}`;
+      const profile = this.loaderProfile
+        ? `${this.loaderProfile.title}: ${this.loaderProfile.repoSupport} `
+        : "";
+      status.textContent = `${profile}${SIDE_LABEL[this.activeSide]} selected. ${this.demo.script === "wristSweep" ? "Wrist sweep is driving J6/J7." : "Keyboard and sliders drive joint-space targets."}`;
     }
   }
 

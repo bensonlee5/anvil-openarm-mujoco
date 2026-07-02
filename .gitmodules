@@ -1,3 +1,6 @@
 [submodule "upstream/openarm_mujoco"]
 	path = upstream/openarm_mujoco
 	url = https://github.com/enactic/openarm_mujoco.git
+[submodule "upstream/anvil_loader"]
+	path = upstream/anvil_loader
+	url = git@github.com:anvil-robotics/anvil-loader.git

@@ -30,7 +30,9 @@ RUN uv sync --frozen --all-groups
 
 COPY . .
 RUN test -f upstream/openarm_mujoco/v2/openarm_bimanual.xml \
-    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init" >&2; exit 1)
+    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init --recursive" >&2; exit 1)
+RUN test -f upstream/anvil_loader/config/openarm_v2_inference.yaml \
+    || (echo "upstream/anvil_loader is missing; run: git submodule update --init --recursive" >&2; exit 1)
 
 CMD ["uv", "run", "pytest"]
 
@@ -50,7 +52,9 @@ RUN npm --prefix web ci
 
 COPY . .
 RUN test -f upstream/openarm_mujoco/v2/openarm_bimanual.xml \
-    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init" >&2; exit 1)
+    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init --recursive" >&2; exit 1)
+RUN test -f upstream/anvil_loader/config/openarm_v2_inference.yaml \
+    || (echo "upstream/anvil_loader is missing; run: git submodule update --init --recursive" >&2; exit 1)
 
 CMD ["npm", "--prefix", "web", "run", "dev"]
 
@@ -97,7 +101,9 @@ RUN pip install --no-cache-dir "mujoco>=3.6" numpy "pytest>=8,<9"
 WORKDIR /ws
 COPY . .
 RUN test -f upstream/openarm_mujoco/v2/openarm_bimanual.xml \
-    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init" >&2; exit 1)
+    || (echo "upstream/openarm_mujoco is missing; run: git submodule update --init --recursive" >&2; exit 1)
+RUN test -f upstream/anvil_loader/config/openarm_v2_inference.yaml \
+    || (echo "upstream/anvil_loader is missing; run: git submodule update --init --recursive" >&2; exit 1)
 
 # /ros_entrypoint.sh from the base image sources /opt/ros/jazzy/setup.bash.
 CMD ["pytest", "tests/", "-v", "--color=yes"]

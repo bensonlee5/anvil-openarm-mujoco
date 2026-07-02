@@ -33,16 +33,61 @@ Run (after sourcing ROS 2):
     python3 -m bridge.ros2_bridge --ros-args -p time_scale:=1.0
 """
 
+from __future__ import annotations
+
 import math
 
-import rclpy
-from builtin_interfaces.msg import Time
-from geometry_msgs.msg import PoseStamped
-from rclpy.node import Node
-from rosgraph_msgs.msg import Clock
-from rosidl_runtime_py.utilities import get_message
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
+ROS2_IMPORT_ERROR = None
+
+try:
+    import rclpy
+    from builtin_interfaces.msg import Time
+    from geometry_msgs.msg import PoseStamped
+    from rclpy.node import Node
+    from rosgraph_msgs.msg import Clock
+    from rosidl_runtime_py.utilities import get_message
+    from sensor_msgs.msg import JointState
+    from std_msgs.msg import Float64MultiArray
+except ModuleNotFoundError as exc:
+    ROS2_IMPORT_ERROR = exc
+    rclpy = None
+
+    class Node:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(_missing_ros2_dependency_message())
+
+    Time = PoseStamped = Clock = JointState = Float64MultiArray = object
+
+    def get_message(type_name: str):
+        raise RuntimeError(_missing_ros2_dependency_message())
+
+
+def _missing_ros2_dependency_message() -> str:
+    missing = (
+        f" Missing Python module: {ROS2_IMPORT_ERROR.name}."
+        if ROS2_IMPORT_ERROR is not None
+        else ""
+    )
+    return (
+        "ROS 2 Python packages are not available in this Python environment."
+        f"{missing}\n\n"
+        "The bridge must run inside a ROS 2 environment; `uv sync` and normal "
+        "`pip install` do not install `rclpy`.\n\n"
+        "On a ROS 2 Jazzy/Linux or Anvil devbox shell:\n"
+        "  source /opt/ros/jazzy/setup.bash\n"
+        "  # source <anvil_workspace>/install/setup.bash  # if using Anvil's "
+        "custom CommandedEEPose\n"
+        "  python3 -m bridge.ros2_bridge --ros-args -p time_scale:=1.0\n\n"
+        "From this repo's Docker harness:\n"
+        "  scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0\n\n"
+        "On macOS, the browser demo works natively, but the ROS 2 bridge needs "
+        "Linux via Docker, a VM, or the robot/devbox environment."
+    )
+
+
+if ROS2_IMPORT_ERROR is not None and __name__ == "__main__":
+    raise SystemExit(_missing_ros2_dependency_message())
+
 
 from anvil_openarm_spec import (
     COMMANDED_EE_TOPICS,
@@ -260,6 +305,8 @@ class OpenArmMujocoBridge(Node):
 
 
 def main(args=None) -> None:
+    if ROS2_IMPORT_ERROR is not None:
+        raise SystemExit(_missing_ros2_dependency_message())
     rclpy.init(args=args)
     node = OpenArmMujocoBridge()
     try:
