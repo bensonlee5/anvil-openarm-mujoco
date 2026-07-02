@@ -38,7 +38,7 @@ function renderSplash(
         <div class="brand__mark">AO</div>
         <span>Anvil OpenARM MuJoCo</span>
       </div>
-      <h1>Hosted robot demos</h1>
+      <h1>OpenARM Demos</h1>
       <p class="splash__copy">
         Select an OpenArm v2 loader profile and browser-based MuJoCo scene, then operate either arm with joint-space keyboard teleop or the actuator sliders.
       </p>
@@ -223,7 +223,10 @@ function profileById(
   return profiles.find((profile) => profile.id === id);
 }
 
-function buildUrl(demoId: string | undefined, configId: string | undefined): string {
+function buildUrl(
+  demoId: string | undefined,
+  configId: string | undefined,
+): string {
   const params = new URLSearchParams();
   if (demoId) {
     params.set("demo", demoId);
@@ -232,7 +235,9 @@ function buildUrl(demoId: string | undefined, configId: string | undefined): str
     params.set("config", configId);
   }
   const query = params.toString();
-  return query ? `${window.location.pathname}?${query}` : window.location.pathname;
+  return query
+    ? `${window.location.pathname}?${query}`
+    : window.location.pathname;
 }
 
 function formatArms(profile: LoaderProfile): string {
