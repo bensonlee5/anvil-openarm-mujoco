@@ -38,7 +38,7 @@ function renderSplash(
         <div class="brand__mark">AO</div>
         <span>Anvil OpenARM MuJoCo</span>
       </div>
-      <h1>Anvil Openarm V2 demo</h1>
+      <h1>OpenARM Demos</h1>
       <p class="splash__copy">
         Select an OpenArm v2 loader profile and browser-based MuJoCo scene, then operate either arm with joint-space keyboard teleop or the actuator sliders.
       </p>
