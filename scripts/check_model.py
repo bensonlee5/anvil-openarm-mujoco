@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-"""Validate the generated Anvil OpenARM 2.0 models against the published spec.
+"""Validate the generated Anvil OpenARM 2.0 models against the local spec.
 
-Spec source: https://docs.anvil.bot/introduction/openarm-2.0 (joint-limit
-comparison table). Anvil OpenARM 2.0 differs from the standard/enactic
+The live Anvil OpenARM 2.0 docs describe the wrist swap and wider J6
+radial/ulnar deviation qualitatively. This repo keeps a local pre-arrival
+numeric spec for the expected Anvil variant. It differs from standard/enactic
 OpenArm v2 in exactly two joints per arm:
 
   - J1: -135 deg .. +135 deg   (standard v2: -80 .. +200 in MJCF convention)
@@ -10,11 +11,11 @@ OpenArm v2 in exactly two joints per arm:
                                 deviation after the v2 wrist swap, and the
                                 extra 25 deg is on the radial (+) side
 
-Everything else must remain identical to upstream. Exits non-zero on any
-violation.
+The generated bimanual model also exposes follower_{l,r}_hand_tcp sites using
+the upstream OpenArm v2 pinch-gripper grasp frame. Everything else must remain
+identical to upstream. Exits non-zero on any violation.
 """
 
-import math
 import sys
 from pathlib import Path
 
@@ -22,42 +23,25 @@ import mujoco
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from anvil_openarm_spec import (  # noqa: E402
+    ARM_JOINT_RANGES,
+    DEG,
+    MODEL_FILES,
+    PATCHED_CTRLRANGES,
+    SIDE_JOINT_RANGES,
+    TCP_SITE_BODY_NAMES,
+    TCP_SITE_NAMES,
+    TCP_SITE_POS,
+    TCP_SITE_QUAT,
+)
+
 MODELS_DIR = ROOT / "models"
 
-DEG = math.pi / 180.0
 TOL = 2e-3  # rad; upstream XML rounds to ~5 significant figures
-
-# Symmetric-per-arm joint ranges (same numbers for left/right because the
-# upstream MJCF mirrors the joint axes between arms).
-ARM_JOINT_RANGES = {
-    "joint1": (-135 * DEG, 135 * DEG),  # Anvil keeps 1.0-style symmetric J1
-    "joint3": (-90 * DEG, 90 * DEG),
-    "joint4": (0.0, 140 * DEG),
-    "joint5": (-90 * DEG, 90 * DEG),
-    "joint6": (-45 * DEG, 70 * DEG),  # Anvil extended deviation range
-    "joint7": (-90 * DEG, 90 * DEG),  # flexion/extension after v2 swap
-}
-
-# J2 is asymmetric and sign-mirrored between arms in the upstream convention.
-SIDE_JOINT_RANGES = {
-    "openarm_left_joint2": (-190 * DEG, 10 * DEG),
-    "openarm_right_joint2": (-10 * DEG, 190 * DEG),
-}
-
-# Actuator ctrlranges that the generator must patch alongside the joints.
-PATCHED_CTRLRANGES = {
-    "left_joint1_ctrl": (-135 * DEG, 135 * DEG),
-    "right_joint1_ctrl": (-135 * DEG, 135 * DEG),
-    "left_joint6_ctrl": (-45 * DEG, 70 * DEG),
-    "right_joint6_ctrl": (-45 * DEG, 70 * DEG),
-}
-
-MODEL_FILES = [
-    "anvil_openarm_bimanual.xml",
-    "anvil_cell.xml",
-    "anvil_demo.xml",
-    "anvil_pedestal.xml",
-]
+TCP_TOL = 1e-6
 
 failures: list[str] = []
 
@@ -96,7 +80,7 @@ def check_joint_ranges(model: mujoco.MjModel, tag: str) -> None:
                 f"([{lo / DEG:.0f}, {hi / DEG:.0f}] deg)"
             )
     if len(failures) == before:
-        ok(f"{tag}: all 14 arm joint ranges match the Anvil 2.0 table")
+        ok(f"{tag}: all 14 arm joint ranges match the local Anvil 2.0 spec")
 
     # Bimanual mirror consistency: identical numeric ranges on mirrored axes.
     for jname in ARM_JOINT_RANGES:
@@ -145,6 +129,39 @@ def check_actuators(model: mujoco.MjModel, tag: str) -> None:
             )
     if len(failures) == before:
         ok(f"{tag}: actuator ctrlranges patched and within joint limits")
+
+
+def check_tcp_sites(model: mujoco.MjModel, tag: str) -> None:
+    before = len(failures)
+    for side, site_name in TCP_SITE_NAMES.items():
+        sid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+        if sid < 0:
+            fail(f"{tag}: TCP site '{site_name}' not found")
+            continue
+        body_name = TCP_SITE_BODY_NAMES[side]
+        bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if bid < 0:
+            fail(f"{tag}: TCP parent body '{body_name}' not found")
+        elif model.site_bodyid[sid] != bid:
+            got = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_BODY, int(model.site_bodyid[sid])
+            )
+            fail(
+                f"{tag}: TCP site '{site_name}' is attached to '{got}', "
+                f"expected '{body_name}'"
+            )
+        if not np.allclose(model.site_pos[sid], TCP_SITE_POS, atol=TCP_TOL):
+            fail(
+                f"{tag}: TCP site '{site_name}' pos is {model.site_pos[sid]}, "
+                f"expected {TCP_SITE_POS}"
+            )
+        if not np.allclose(model.site_quat[sid], TCP_SITE_QUAT, atol=TCP_TOL):
+            fail(
+                f"{tag}: TCP site '{site_name}' quat is {model.site_quat[sid]}, "
+                f"expected {TCP_SITE_QUAT}"
+            )
+    if len(failures) == before:
+        ok(f"{tag}: follower hand TCP sites match the upstream v2 grasp frame")
 
 
 def check_keyframes(model: mujoco.MjModel, tag: str) -> None:
@@ -211,6 +228,7 @@ def main() -> int:
         ok(f"compiles ({model.njnt} joints, {model.nu} actuators)")
         check_joint_ranges(model, fname)
         check_actuators(model, fname)
+        check_tcp_sites(model, fname)
         check_keyframes(model, fname)
         check_stability(model, fname)
 

@@ -9,5 +9,8 @@ dependencies = [
     "numpy",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
 [tool.uv]
 package = false

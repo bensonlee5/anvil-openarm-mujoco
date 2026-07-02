@@ -4,8 +4,8 @@ GENERATED FILE - do not edit by hand. Regenerate with:
     uv run python scripts/make_anvil_model.py
 
 Derived from upstream/openarm_mujoco/v2/openarm_bimanual.xml (enactic/openarm_mujoco,
-Apache-2.0) with Anvil OpenARM 2.0 joint changes: J1 +/-135 deg,
-J6 -45..+70 deg. Spec: https://docs.anvil.bot/introduction/openarm-2.0
+Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
+J6 -45..+70 deg, plus follower hand TCP sites.
 -->
 <!--
 Copyright 2026 Enactic, Inc.
@@ -237,6 +237,7 @@ limitations under the License.
                     <geom name="ee_base_link_left_collision_00" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" mesh="ee_base_link_left_collision_00" class="collision" />
                     <camera name="camera_wrist_left" pos="0.023 0.0182 -0.10236" euler="-0.366519 0.22689 -1.5708" fovy="66" resolution="960 600"/>
                     <site name="left_ee_control_point" pos="0 0 0.0" size="0.01" rgba="0 1 0 1" />
+                    <site name="follower_l_hand_tcp" pos="-0.02193 0 -0.138" quat="0.70710678 0 0.70710678 0" size="0.01" rgba="0 0.6 1 1" />
                     <body name="openarm_left_ee_inner_finger" pos="-0.00143 -0.018 -0.068">
                       <inertial pos="-0.0124991 -0.00176593 -0.0241663" quat="0.982638 0.0922084 -0.15927 -0.0235197" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05" />
                       <joint name="openarm_left_finger_joint1" pos="0 0 0" axis="-1 0 0" range="0 0.7854" actuatorfrcrange="-10 10" class="motor_finger" />
@@ -325,6 +326,7 @@ limitations under the License.
                     <geom name="ee_base_link_right_collision_00" pos="0.0205 0 0" quat="1 0 0 0" type="mesh" mesh="ee_base_link_right_collision_00" class="collision" />
                     <camera name="camera_wrist_right" pos="0.023 -0.0182 -0.10236" euler="0.366519 0.22689 -1.5708" fovy="66" resolution="960 600"/>
                     <site name="right_ee_control_point" pos="0.0 0.0 0.0" size="0.01" rgba="1 0 0 1" />
+                    <site name="follower_r_hand_tcp" pos="-0.02193 0 -0.138" quat="0.70710678 0 0.70710678 0" size="0.01" rgba="0 0.6 1 1" />
                     <body name="openarm_right_ee_inner_finger" pos="-0.00143 0.018 -0.068">
                       <inertial pos="-0.0124991 0.00176593 -0.0241663" quat="0.982638 -0.0922084 -0.15927 0.0235197" mass="0.125979" diaginertia="3.8543e-05 3.6883e-05 1.43942e-05" />
                       <joint name="openarm_right_finger_joint1" pos="0 0 0" axis="-1 0 0" range="-0.7854 0" actuatorfrcrange="-10 10" class="motor_finger" />

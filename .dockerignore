@@ -1,0 +1,6 @@
+.git
+.venv
+out
+__pycache__
+**/__pycache__
+MUJOCO_LOG.TXT
