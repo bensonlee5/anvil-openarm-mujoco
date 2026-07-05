@@ -5,7 +5,8 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 
 Derived from upstream/openarm_mujoco/v2/openarm_bimanual.xml (enactic/openarm_mujoco,
 Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, plus follower hand TCP sites.
+J6 -45..+70 deg, follower hand TCP sites, plus the stylised red Anvil
+wrist bracket (visual-only inline meshes on the link6 bodies).
 -->
 <!--
 Copyright 2026 Enactic, Inc.
@@ -177,6 +178,9 @@ limitations under the License.
     <mesh name="finger_outer_right_collision_01" content_type="model/stl" file="collision/finger_outer_part_01.stl" />
     <mesh name="finger_outer_right_collision_02" content_type="model/stl" file="collision/finger_outer_part_02.stl" />
     <mesh name="finger_outer_right_collision_03" content_type="model/stl" file="collision/finger_outer_part_03.stl" />
+    <material name="anvil_red" rgba="0.72 0.06 0.06 1" specular="0.4" shininess="0.3" />
+    <mesh name="anvil_wrist_bracket_left" vertex="0.002 0.036 -0.013 0.026 0.036 -0.013 0.026 0.053 -0.013 0.002 0.053 -0.013 0.002 0.036 0.013 0.026 0.036 0.013 0.026 0.053 0.013 0.002 0.053 0.013 0.024 0.041 -0.011 0.068 0.041 -0.011 0.068 0.051 -0.011 0.024 0.051 -0.011 0.024 0.041 0.011 0.068 0.041 0.011 0.068 0.051 0.011 0.024 0.051 0.011 0.061 0.005 -0.011 0.07 0.005 -0.011 0.07 0.051 -0.011 0.061 0.051 -0.011 0.061 0.005 0.011 0.07 0.005 0.011 0.07 0.051 0.011 0.061 0.051 0.011 0.062 -0.014 -0.018 0.069 -0.014 -0.018 0.069 0.022 -0.018 0.062 0.022 -0.018 0.062 -0.014 0.014 0.069 -0.014 0.014 0.069 0.022 0.014 0.062 0.022 0.014" face="0 2 1 0 3 2 4 5 6 4 6 7 0 1 5 0 5 4 2 3 7 2 7 6 0 4 7 0 7 3 1 2 6 1 6 5 8 10 9 8 11 10 12 13 14 12 14 15 8 9 13 8 13 12 10 11 15 10 15 14 8 12 15 8 15 11 9 10 14 9 14 13 16 18 17 16 19 18 20 21 22 20 22 23 16 17 21 16 21 20 18 19 23 18 23 22 16 20 23 16 23 19 17 18 22 17 22 21 24 26 25 24 27 26 28 29 30 28 30 31 24 25 29 24 29 28 26 27 31 26 31 30 24 28 31 24 31 27 25 26 30 25 30 29" />
+    <mesh name="anvil_wrist_bracket_right" vertex="0.002 -0.036 -0.013 0.026 -0.036 -0.013 0.026 -0.053 -0.013 0.002 -0.053 -0.013 0.002 -0.036 0.013 0.026 -0.036 0.013 0.026 -0.053 0.013 0.002 -0.053 0.013 0.024 -0.041 -0.011 0.068 -0.041 -0.011 0.068 -0.051 -0.011 0.024 -0.051 -0.011 0.024 -0.041 0.011 0.068 -0.041 0.011 0.068 -0.051 0.011 0.024 -0.051 0.011 0.061 -0.005 -0.011 0.07 -0.005 -0.011 0.07 -0.051 -0.011 0.061 -0.051 -0.011 0.061 -0.005 0.011 0.07 -0.005 0.011 0.07 -0.051 0.011 0.061 -0.051 0.011 0.062 0.014 -0.018 0.069 0.014 -0.018 0.069 -0.022 -0.018 0.062 -0.022 -0.018 0.062 0.014 0.014 0.069 0.014 0.014 0.069 -0.022 0.014 0.062 -0.022 0.014" face="0 1 2 0 2 3 4 6 5 4 7 6 0 5 1 0 4 5 2 7 3 2 6 7 0 7 4 0 3 7 1 6 2 1 5 6 8 9 10 8 10 11 12 14 13 12 15 14 8 13 9 8 12 13 10 15 11 10 14 15 8 15 12 8 11 15 9 14 10 9 13 14 16 17 18 16 18 19 20 22 21 20 23 22 16 21 17 16 20 21 18 23 19 18 22 23 16 23 20 16 19 23 17 22 18 17 21 22 24 25 26 24 26 27 28 30 29 28 31 30 24 29 25 24 28 29 26 31 27 26 30 31 24 31 28 24 27 31 25 30 26 25 29 30" />
   </asset>
   <worldbody>
     <body name="openarm_left_base_link" pos="0 0.031 0">
@@ -228,6 +232,7 @@ limitations under the License.
                   <geom name="link6_left_01" type="mesh" mesh="link6_left_01" class="visual" material="metal_silver" />
                   <geom name="link6_left_02" type="mesh" mesh="link6_left_02" class="visual" material="pale_silver" />
                   <geom name="link6_left_collision_00" type="mesh" mesh="link6_left_collision_00" class="collision" />
+                  <geom name="anvil_wrist_bracket_left" type="mesh" mesh="anvil_wrist_bracket_left" class="visual" material="anvil_red" />
                   <body name="openarm_left_ee_base_link">
                     <inertial pos="0.0137902 -0.0084073 -0.05938" quat="0.760121 0.648846 -0.0304587 -0.0169317" mass="0.52832" diaginertia="0.000219417 0.000166122 0.000155742" />
                     <joint name="openarm_left_joint7" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708" actuatorfrcrange="-7 7" class="motor_DM3507" />
@@ -317,6 +322,7 @@ limitations under the License.
                   <geom name="link6_right_01" type="mesh" mesh="link6_right_01" class="visual" material="metal_silver" />
                   <geom name="link6_right_02" type="mesh" mesh="link6_right_02" class="visual" material="pale_silver" />
                   <geom name="link6_right_collision_00" type="mesh" mesh="link6_right_collision_00" class="collision" />
+                  <geom name="anvil_wrist_bracket_right" type="mesh" mesh="anvil_wrist_bracket_right" class="visual" material="anvil_red" />
                   <body name="openarm_right_ee_base_link">
                     <inertial pos="0.0137902 0.0084073 -0.05938" quat="0.648846 0.760121 0.0169317 0.0304587" mass="0.52832" diaginertia="0.000219417 0.000166122 0.000155742" />
                     <joint name="openarm_right_joint7" pos="0 0 0" axis="1 0 0" range="-1.5708 1.5708" actuatorfrcrange="-7 7" class="motor_DM3507" />

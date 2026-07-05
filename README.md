@@ -167,11 +167,12 @@ and regenerate rather than editing them directly.
 ## What makes it the *Anvil* OpenARM 2.0
 
 The live Anvil docs describe the OpenARM 2.0 wrist swap and a wider J6
-radial/ulnar deviation range qualitatively
-([docs](https://docs.anvil.bot/introduction/openarm-2.0)), but they no longer
-expose an inline numeric comparison table. This repo keeps the following local
-pre-arrival numeric spec until the hardware can be measured or Anvil publishes
-updated machine-readable limits:
+radial/ulnar deviation range
+([docs](https://docs.anvil.bot/introduction/openarm-2.0)); the comparison
+table is published there as an image. The local numeric spec below matches
+that table exactly (verified against the docs 2026-07-05) and is kept in
+machine-readable form here until the hardware can be measured or Anvil
+publishes machine-readable limits:
 
 | Joint | Anvil OpenARM 1.0 | Standard OpenARM 2.0 | **Anvil OpenARM 2.0** |
 |---|---|---|---|
@@ -195,6 +196,14 @@ deltas on both arms, to joint `range` and actuator `ctrlrange`:
 - **TCP sites** — `follower_l_hand_tcp` and `follower_r_hand_tcp`, using the
   upstream OpenArm v2 pinch-gripper grasp-frame transform so `/ee_pose_*`
   represents the end-effector TCP rather than the gripper base.
+- **The red wrist bracket** — the C-bracket shown on the Anvil variant in the
+  docs photo (it clamps the J6 rotor hub and lands on a plate bolted to the
+  J7 motor end cap; it is the part that enables the extra +25 deg of
+  deviation). Stock v2 meshes don't include it, so the generator emits a
+  stylised **visual-only** approximation as inline MJCF meshes (one mirrored
+  mesh per side, `anvil_wrist_bracket_{left,right}`) attached to the `link6`
+  gimbal bodies. Dimensions live in `anvil_openarm_spec.WRIST_BRACKET_BOXES`
+  and are validated by `scripts/check_model.py`.
 
 ### Sign conventions, verified
 
@@ -413,10 +422,12 @@ programmatic control
 
 ## Known approximations
 
-- **Meshes are stock OpenArm v2.** Anvil's 2.0 hardware adds a wrist bracket
-  (and hard-case cabling) that the visual/collision meshes don't show. Joint
-  frame positions are assumed unchanged from standard v2 — Anvil describes
-  the change as range-of-motion only.
+- **Meshes are stock OpenArm v2 plus a stylised bracket.** Anvil's 2.0
+  hardware adds a wrist bracket (and hard-case cabling); the bracket is
+  represented by a generated, visual-only cuboid mesh sized off the upstream
+  wrist meshes and eyeballed against the docs photo — it is not Anvil's CAD
+  and takes part in no collision. Joint frame positions are assumed unchanged
+  from standard v2 — Anvil describes the change as range-of-motion only.
 - **J1 = ±135° follows this repo's local pre-arrival spec.** Anvil's public
   `openarm_description` repository and upstream standard v2 allow
   -80°..+200° for J1, so ±135° may be an operational rather than mechanical
