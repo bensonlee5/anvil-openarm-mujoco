@@ -76,6 +76,21 @@ PATCHED_XML_RANGES = {
     ("right_joint6_ctrl", "ctrlrange"): "-0.785398 1.22173",
 }
 
+# URDF <limit lower="..." upper="..."> values for the same patched joints.
+# The numbers are identical to the MJCF range= values because the upstream
+# URDF (enactic/openarm_description v2 example) uses the same joint axes and
+# sign conventions as the upstream MJCF on every joint — verified per-joint
+# by tests/test_urdf_generation.py.
+PATCHED_URDF_LIMITS = {
+    name: tuple(PATCHED_XML_RANGES[(name, "range")].split())
+    for name in (
+        "openarm_left_joint1",
+        "openarm_right_joint1",
+        "openarm_left_joint6",
+        "openarm_right_joint6",
+    )
+}
+
 # Upstream OpenArm v2 pinch-gripper grasp frame, exposed here under Anvil's
 # documented follower_{l,r}_hand_tcp naming convention.
 TCP_SITE_NAMES = {"l": "follower_l_hand_tcp", "r": "follower_r_hand_tcp"}
@@ -85,6 +100,9 @@ TCP_SITE_BODY_NAMES = {
 }
 TCP_SITE_POS = (-0.02193, 0.0, -0.138)
 TCP_SITE_QUAT = (0.70710678, 0.0, 0.70710678, 0.0)
+# The same rotation as TCP_SITE_QUAT (+90 deg about y) in URDF fixed-axis
+# roll/pitch/yaw form; tests assert the two stay consistent.
+TCP_SITE_RPY = (0.0, math.pi / 2, 0.0)
 
 TCP_SITE_XML = (
     'pos="-0.02193 0 -0.138" '
