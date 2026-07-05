@@ -103,15 +103,16 @@ GRIPPER_METERS_RANGE = (-0.003, 0.05)
 # radial deviation. Stock v2 meshes don't include it, so the generator emits a
 # stylised visual-only approximation as inline MJCF meshes (one mirrored mesh
 # per side) attached to the link6 gimbal body — the body that spans J6 → J7.
-# Cuboids are (center, half-size) in the LEFT link6 frame (J6 axis = y,
-# J7 axis = x, forearm = +z); the right side mirrors y. Dimensions are sized
-# off the upstream v2 wrist meshes (J6 hub face at y ~ +0.035, J7 end cap at
-# x ~ +0.062) — eyeballed against the docs photo, not measured hardware.
+# Cuboids are (center, half-size) in the LEFT link6 frame (J6 axis = y with
+# the rotor hub face at y ~ +0.045; J7 axis = x with the J7 motor housing —
+# the ee_base cylinder — spanning z -0.023..-0.113; the hand continues in -z);
+# the right side mirrors y. Sized against the model's own geom AABBs so the
+# lug lands on the J6 hub face and the foot on the J7 housing barrel — a
+# stylised take on the docs photo, not measured hardware.
 WRIST_BRACKET_BOXES = [
-    ((0.014, 0.0445, 0.000), (0.012, 0.0085, 0.013)),  # lug on the J6 rotor hub
-    ((0.046, 0.0460, 0.000), (0.022, 0.0050, 0.011)),  # channel across to the J7 cap
-    ((0.0655, 0.0280, 0.000), (0.0045, 0.0230, 0.011)),  # drop arm at the cap rim
-    ((0.0655, 0.0040, -0.002), (0.0035, 0.0180, 0.016)),  # plate on the J7 end cap
+    ((0.014, 0.0570, 0.000), (0.012, 0.0155, 0.013)),  # lug out from the J6 hub face
+    ((0.014, 0.0670, -0.034), (0.012, 0.0055, 0.040)),  # arm dropping past the housing
+    ((0.014, 0.0605, -0.068), (0.012, 0.0125, 0.012)),  # foot onto the J7 motor housing
 ]
 WRIST_BRACKET_RGBA = (0.72, 0.06, 0.06, 1.0)
 WRIST_BRACKET_MATERIAL = "anvil_red"

@@ -226,6 +226,59 @@ wrist bracket (visual-only inline meshes on the link6 bodies).
 """
 
 
+def inject_keyframe_ctrl(path: Path) -> bool:
+    """Add ctrl to every keyframe so position actuators hold the keyframe pose.
+
+    Upstream keyframes carry qpos only; with ctrl defaulting to zero, any
+    consumer that seeds actuator targets from key_ctrl (e.g. the web viewer)
+    watches the arms sag out of the home pose. Derive each actuator's ctrl
+    from its joint's keyframe qpos, clamped to ctrlrange.
+    """
+    import mujoco
+
+    # Load without depending on the output directory's location: the
+    # generated meshdir is relative to models/, which breaks when generating
+    # elsewhere (e.g. the reproducibility test's tmp dir). Point meshdir at
+    # the submodule absolutely and feed <include> files as in-memory assets.
+    abs_meshdir = f'meshdir="{(UPSTREAM / "assets").resolve()}"'
+
+    def absolutized(p: Path) -> str:
+        return p.read_text().replace(MESHDIR_NEW, abs_meshdir)
+
+    xml = absolutized(path)
+    assets = {
+        m.group(1): absolutized(path.parent / m.group(1)).encode()
+        for m in re.finditer(r'<(?:include|model)\b[^>]*file="([^"]+\.xml)"', xml)
+    }
+    model = mujoco.MjModel.from_xml_string(xml, assets)
+    if model.nkey == 0:
+        return True
+    text = path.read_text()
+    for k in range(model.nkey):
+        kname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, k) or ""
+        ctrl = []
+        for aid in range(model.nu):
+            value = 0.0
+            if model.actuator_trntype[aid] == mujoco.mjtTrn.mjTRN_JOINT:
+                jid = int(model.actuator_trnid[aid, 0])
+                value = float(model.key_qpos[k][model.jnt_qposadr[jid]])
+                lo, hi = model.actuator_ctrlrange[aid]
+                if model.actuator_ctrllimited[aid]:
+                    value = min(max(value, float(lo)), float(hi))
+            ctrl.append(value)
+        ctrl_attr = " ".join(f"{v:.6g}" for v in ctrl)
+        pattern = rf'(<key name="{re.escape(kname)}"[^>]*?)\s*/>'
+        text, n = re.subn(pattern, rf'\g<1>\n      ctrl="{ctrl_attr}" />', text, flags=re.DOTALL)
+        if n != 1:
+            print(
+                f"ERROR: keyframe '{kname}' matched {n} times (expected 1) in {path.name}; "
+                "update inject_keyframe_ctrl."
+            )
+            return False
+    path.write_text(text)
+    return True
+
+
 def generate(out_dir: Path = OUT, verbose: bool = True) -> int:
     if not UPSTREAM.is_dir():
         print(f"upstream checkout not found: {UPSTREAM}")
@@ -254,6 +307,8 @@ def generate(out_dir: Path = OUT, verbose: bool = True) -> int:
             text = header + text
         out_path = out_dir / spec["out"]
         out_path.write_text(text)
+        if not inject_keyframe_ctrl(out_path):
+            return 1
         if verbose:
             try:
                 shown = out_path.relative_to(ROOT)
