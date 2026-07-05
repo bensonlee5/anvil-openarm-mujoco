@@ -95,3 +95,25 @@ TCP_SITE_XML = (
 # Anvil CommandedEEPose gripper opening, in metres. The MJCF gripper itself is
 # controlled by mirrored finger angles, so sim_core maps this scalar per side.
 GRIPPER_METERS_RANGE = (-0.003, 0.05)
+
+# ── Anvil 2.0 wrist bracket ──────────────────────────────────────────────────
+# The red C-bracket shown on the Anvil variant in the OpenARM 2.0 docs photo:
+# it clamps onto the J6 rotor hub, runs out past the J7 motor, and lands on a
+# plate bolted to the J7 end cap — the part that enables the extra +25 deg of
+# radial deviation. Stock v2 meshes don't include it, so the generator emits a
+# stylised visual-only approximation as inline MJCF meshes (one mirrored mesh
+# per side) attached to the link6 gimbal body — the body that spans J6 → J7.
+# Cuboids are (center, half-size) in the LEFT link6 frame (J6 axis = y,
+# J7 axis = x, forearm = +z); the right side mirrors y. Dimensions are sized
+# off the upstream v2 wrist meshes (J6 hub face at y ~ +0.035, J7 end cap at
+# x ~ +0.062) — eyeballed against the docs photo, not measured hardware.
+WRIST_BRACKET_BOXES = [
+    ((0.014, 0.0445, 0.000), (0.012, 0.0085, 0.013)),  # lug on the J6 rotor hub
+    ((0.046, 0.0460, 0.000), (0.022, 0.0050, 0.011)),  # channel across to the J7 cap
+    ((0.0655, 0.0280, 0.000), (0.0045, 0.0230, 0.011)),  # drop arm at the cap rim
+    ((0.0655, 0.0040, -0.002), (0.0035, 0.0180, 0.016)),  # plate on the J7 end cap
+]
+WRIST_BRACKET_RGBA = (0.72, 0.06, 0.06, 1.0)
+WRIST_BRACKET_MATERIAL = "anvil_red"
+WRIST_BRACKET_MESH_NAMES = {"l": "anvil_wrist_bracket_left", "r": "anvil_wrist_bracket_right"}
+WRIST_BRACKET_BODY_NAMES = {"l": "openarm_left_link6", "r": "openarm_right_link6"}

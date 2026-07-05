@@ -4,7 +4,8 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 
 Derived from upstream/openarm_mujoco/v2/pedestal.xml (enactic/openarm_mujoco,
 Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, plus follower hand TCP sites.
+J6 -45..+70 deg, follower hand TCP sites, plus the stylised red Anvil
+wrist bracket (visual-only inline meshes on the link6 bodies).
 -->
 <!--
 Copyright 2026 Enactic, Inc.

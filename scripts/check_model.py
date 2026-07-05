@@ -38,6 +38,10 @@ from anvil_openarm_spec import (  # noqa: E402
     TCP_SITE_NAMES,
     TCP_SITE_POS,
     TCP_SITE_QUAT,
+    WRIST_BRACKET_BODY_NAMES,
+    WRIST_BRACKET_BOXES,
+    WRIST_BRACKET_MESH_NAMES,
+    WRIST_BRACKET_RGBA,
 )
 
 MODELS_DIR = ROOT / "models"
@@ -185,6 +189,70 @@ def check_tcp_sites(model: mujoco.MjModel, tag: str) -> None:
         ok(f"{tag}: follower hand TCP sites match the upstream v2 grasp frame")
 
 
+def check_wrist_bracket(model: mujoco.MjModel, tag: str) -> None:
+    """The red Anvil wrist bracket: one visual-only mesh geom per link6 body.
+
+    Checks presence, parenting, colour, non-collidability, and that each
+    side's mesh AABB matches the union of the spec cuboids (the right side
+    mirrored in y) — so a generator regression can't silently drop or
+    misplace the bracket.
+    """
+    before = len(failures)
+    lo = np.min(
+        [[c[i] - h[i] for i in range(3)] for c, h in WRIST_BRACKET_BOXES], axis=0
+    )
+    hi = np.max(
+        [[c[i] + h[i] for i in range(3)] for c, h in WRIST_BRACKET_BOXES], axis=0
+    )
+    expected_aabb = {
+        "l": (lo, hi),
+        "r": (lo * np.array([1, -1, 1]), hi * np.array([1, -1, 1])),
+    }
+    for side, mesh_name in WRIST_BRACKET_MESH_NAMES.items():
+        gid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, mesh_name)
+        if gid < 0:
+            fail(f"{tag}: wrist bracket geom '{mesh_name}' not found")
+            continue
+        body_name = WRIST_BRACKET_BODY_NAMES[side]
+        bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        if model.geom_bodyid[gid] != bid:
+            got = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_BODY, int(model.geom_bodyid[gid])
+            )
+            fail(f"{tag}: bracket '{mesh_name}' attached to '{got}', expected '{body_name}'")
+        if model.geom_type[gid] != mujoco.mjtGeom.mjGEOM_MESH:
+            fail(f"{tag}: bracket '{mesh_name}' is not a mesh geom")
+            continue
+        if model.geom_contype[gid] != 0 or model.geom_conaffinity[gid] != 0:
+            fail(f"{tag}: bracket '{mesh_name}' must be visual-only (contype/conaffinity 0)")
+        mat_id = model.geom_matid[gid]
+        rgba = model.mat_rgba[mat_id] if mat_id >= 0 else model.geom_rgba[gid]
+        if not np.allclose(rgba, WRIST_BRACKET_RGBA, atol=1e-6):
+            fail(f"{tag}: bracket '{mesh_name}' rgba is {rgba}, expected {WRIST_BRACKET_RGBA}")
+        mesh_id = model.geom_dataid[gid]
+        va, vn = model.mesh_vertadr[mesh_id], model.mesh_vertnum[mesh_id]
+        verts = model.mesh_vert[va : va + vn].reshape(-1, 3)
+        # MuJoCo re-centers user meshes at their CoM and rotates them into
+        # the principal inertia frame, compensating via the geom pos/quat —
+        # map the vertices back into the body (link6) frame before comparing.
+        rot = np.zeros(9)
+        mujoco.mju_quat2Mat(rot, model.geom_quat[gid])
+        verts = verts @ rot.reshape(3, 3).T + model.geom_pos[gid]
+        exp_lo, exp_hi = expected_aabb[side]
+        got_lo = verts.min(axis=0)
+        got_hi = verts.max(axis=0)
+        if not (
+            np.allclose(np.minimum(got_lo, got_hi), np.minimum(exp_lo, exp_hi), atol=1e-5)
+            and np.allclose(np.maximum(got_lo, got_hi), np.maximum(exp_lo, exp_hi), atol=1e-5)
+        ):
+            fail(
+                f"{tag}: bracket '{mesh_name}' AABB [{got_lo}, {got_hi}] does not "
+                f"match the spec cuboids [{exp_lo}, {exp_hi}]"
+            )
+    if len(failures) == before:
+        ok(f"{tag}: Anvil wrist bracket present on both link6 bodies (visual-only, red)")
+
+
 def check_keyframes(model: mujoco.MjModel, tag: str) -> None:
     for kid in range(model.nkey):
         kname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, kid) or str(kid)
@@ -248,6 +316,7 @@ def main() -> int:
         check_joint_ranges(model, fname)
         check_actuators(model, fname)
         check_tcp_sites(model, fname)
+        check_wrist_bracket(model, fname)
         check_keyframes(model, fname)
         check_stability(model, fname)
 
