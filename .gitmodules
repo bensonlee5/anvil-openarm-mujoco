@@ -4,3 +4,6 @@
 [submodule "upstream/anvil_loader"]
 	path = upstream/anvil_loader
 	url = git@github.com:anvil-robotics/anvil-loader.git
+[submodule "upstream/openarm_description"]
+	path = upstream/openarm_description
+	url = https://github.com/enactic/openarm_description.git
