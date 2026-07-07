@@ -14,8 +14,9 @@ and MJCF share joint axes and sign conventions on every joint (verified by
 tests/test_urdf_generation.py). The generated URDF also exposes
 follower_{l,r}_hand_tcp as massless links on fixed joints at the upstream
 pinch-gripper grasp frame — the URDF counterpart of the MJCF TCP sites — and
-carries the stylised red Anvil wrist bracket as visual-only boxes on the
-link6 links.
+carries the Anvil wrist support bracket (the CAD STL mesh plus screw and
+standoff cylinders) as visual-only blocks on the link5 forearm links,
+mirroring the MJCF exactly.
 
 All other content is preserved byte-for-byte, except that
 package://openarm_description/ mesh references are rewritten to paths
@@ -40,10 +41,17 @@ from anvil_openarm_spec import (  # noqa: E402
     TCP_SITE_POS,
     TCP_SITE_RPY,
     WRIST_BRACKET_BODY_NAMES,
-    WRIST_BRACKET_BOXES,
+    WRIST_BRACKET_LINK5_CYLINDERS,
     WRIST_BRACKET_MATERIAL,
+    WRIST_BRACKET_MESH_ASSET,
     WRIST_BRACKET_MESH_NAMES,
+    WRIST_BRACKET_MESH_SCALES,
     WRIST_BRACKET_RGBA,
+    WRIST_BRACKET_SCREW_CYLINDERS,
+    WRIST_BRACKET_SCREW_MATERIAL,
+    WRIST_BRACKET_SCREW_RGBA,
+    wrist_bracket_link5_geom_names,
+    wrist_bracket_screw_geom_names,
 )
 
 UPSTREAM = ROOT / "upstream" / "openarm_description"
@@ -54,6 +62,13 @@ OUT_NAME = "anvil_openarm_bimanual.urdf"
 # Mesh references: ROS package URI -> path relative to models/.
 PKG_PREFIX = "package://openarm_description/"
 MESH_PREFIX = "../upstream/openarm_description/"
+# The CAD bracket mesh copied into models/assets/ by make_anvil_model.py,
+# referenced relative to models/ (where the URDF lives).
+BRACKET_MESH_PATH = f"assets/{WRIST_BRACKET_MESH_ASSET}"
+# URDF cylinders run along local z; these rpy values rotate z onto the spec
+# cylinder axes (y for the lug screws and standoff, x for the foot screws).
+_RPY_Z_TO_Y = "-1.5707963267948966 0 0"
+_RPY_Z_TO_X = "0 1.5707963267948966 0"
 
 
 def _fmt(values) -> str:
@@ -91,39 +106,75 @@ def tcp_block(side: str) -> str:
     )
 
 
+def _cylinder_visual(name: str, cylinder: tuple, sy: float, material: str) -> str:
+    """A spec ((from), (to), radius) cylinder as a URDF <visual> block."""
+    start, end, radius = cylinder
+    start = (start[0], sy * start[1], start[2])
+    end = (end[0], sy * end[1], end[2])
+    mid = tuple((a + b) / 2 for a, b in zip(start, end))
+    length = sum((b - a) ** 2 for a, b in zip(start, end)) ** 0.5
+    axis = tuple((b - a) / length for a, b in zip(start, end))
+    rpy = _RPY_Z_TO_X if abs(axis[0]) > 0.5 else _RPY_Z_TO_Y
+    return (
+        f'    <visual name="{name}">\n'
+        f'      <origin rpy="{rpy}" xyz="{_fmt(mid)}"/>\n'
+        f'      <geometry>\n'
+        f'        <cylinder length="{repr(length)}" radius="{repr(float(radius))}"/>\n'
+        f'      </geometry>\n'
+        f'      <material name="{material}"/>\n'
+        f'    </visual>'
+    )
+
+
 def bracket_visuals(side: str) -> str:
-    """Visual-only <visual> boxes on link6 — same cuboids as the MJCF mesh."""
+    """Visual-only bracket blocks on link5: the CAD STL mesh (right side
+    mirrored in y via a negative mesh scale, like the MJCF), the dark screw
+    heads, and the forearm-standoff cylinder — same geoms as the MJCF."""
     sy = -1.0 if side == "r" else 1.0
-    base = WRIST_BRACKET_MESH_NAMES[side]
-    blocks = []
-    for i, ((cx, cy, cz), half) in enumerate(WRIST_BRACKET_BOXES):
-        size = _fmt(2 * h for h in half)
+    scale = WRIST_BRACKET_MESH_SCALES[side]
+    blocks = [
+        f'    <visual name="{WRIST_BRACKET_MESH_NAMES[side]}">\n'
+        f'      <origin rpy="0 0 0" xyz="0 0 0"/>\n'
+        f'      <geometry>\n'
+        f'        <mesh filename="{BRACKET_MESH_PATH}" scale="{scale}"/>\n'
+        f'      </geometry>\n'
+        f'      <material name="{WRIST_BRACKET_MATERIAL}"/>\n'
+        f'    </visual>'
+    ]
+    screw_names = wrist_bracket_screw_geom_names(side)
+    for key, cylinder in WRIST_BRACKET_SCREW_CYLINDERS.items():
         blocks.append(
-            f'    <visual name="{base}_{i}">\n'
-            f'      <origin rpy="0 0 0" xyz="{_fmt((cx, sy * cy, cz))}"/>\n'
-            f'      <geometry>\n'
-            f'        <box size="{size}"/>\n'
-            f'      </geometry>\n'
-            f'      <material name="{WRIST_BRACKET_MATERIAL}"/>\n'
-            f'    </visual>'
+            _cylinder_visual(screw_names[key], cylinder, sy, WRIST_BRACKET_SCREW_MATERIAL)
+        )
+    standoff_names = wrist_bracket_link5_geom_names(side)
+    for key, cylinder in WRIST_BRACKET_LINK5_CYLINDERS.items():
+        blocks.append(
+            _cylinder_visual(standoff_names[key], cylinder, sy, WRIST_BRACKET_MATERIAL)
         )
     return "\n".join(blocks)
 
 
 def bracket_insertion(side: str) -> tuple[str, str]:
-    """Insert the bracket visuals after link6's collision block, keeping the
+    """Insert the bracket visuals after link5's collision block, keeping the
     link's visual/collision/inertial order intact."""
     link = WRIST_BRACKET_BODY_NAMES[side]
     pattern = rf'(?s)(<collision name="{re.escape(link)}_collision">.*?</collision>)'
     return pattern, rf"\g<1>\n{bracket_visuals(side)}"
 
 
+def _material_block(name: str, rgba: tuple) -> str:
+    return (
+        f'  <material name="{name}">\n'
+        f'    <color rgba="{" ".join(f"{v:.6g}" for v in rgba)}"/>\n'
+        '  </material>'
+    )
+
+
 ROBOT_TAG_OLD = '<robot name="openarm_v20">'
 ROBOT_TAG_NEW = (
     '<robot name="anvil_openarm_v20">\n'
-    f'  <material name="{WRIST_BRACKET_MATERIAL}">\n'
-    f'    <color rgba="{" ".join(f"{v:.6g}" for v in WRIST_BRACKET_RGBA)}"/>\n'
-    '  </material>'
+    f"{_material_block(WRIST_BRACKET_MATERIAL, WRIST_BRACKET_RGBA)}\n"
+    f"{_material_block(WRIST_BRACKET_SCREW_MATERIAL, WRIST_BRACKET_SCREW_RGBA)}"
 )
 
 # (pattern, replacement); each must match exactly once.
@@ -155,9 +206,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 Derived from upstream/openarm_description
 assets/robot/openarm_v2.0/urdf/example/v2.urdf (enactic/openarm_description,
 Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP frames, plus the stylised red Anvil
-wrist bracket (visual-only boxes on the link6 links). Mesh references are
-rewritten from package:// URIs to paths relative to this directory.
+J6 -45..+70 deg, follower hand TCP frames, plus the Anvil wrist support
+bracket from user hardware CAD (visual-only mesh + cylinder detail on the
+link5 forearm links). Mesh references are rewritten from package:// URIs to
+paths relative to this directory.
 -->
 """
 
