@@ -52,6 +52,7 @@ git submodule update --init --recursive      # first checkout only
 uv sync                          # installs Python deps
 
 uv run python scripts/make_anvil_model.py   # regenerate models/ from upstream
+uv run python scripts/make_anvil_urdf.py    # regenerate the URDF counterpart
 uv run python scripts/check_model.py        # validate against the Anvil spec
 
 uv run python scripts/view.py                          # native desktop viewer on Linux
@@ -162,8 +163,10 @@ scripts/run_docker.sh viewer-smoke
 | `models/anvil_pedestal.xml` | arm on a pedestal with floor and lighting |
 | `models/assets/anvil_wrist_bracket.stl` | wrist support bracket mesh, copied from the CAD export `cad/anvil_wrist_bracket.stl` (source: `cad/anvil_openarm2_wrist_bracket_source.step` via `cad/anvil_wrist_bracket.py`) |
 
-All are **generated files** — edit `scripts/make_anvil_model.py` (or upstream)
-and regenerate rather than editing them directly.
+All are **generated files** — edit `scripts/make_anvil_model.py` /
+`scripts/make_anvil_urdf.py` (or upstream) and regenerate rather than editing
+them directly. `tests/test_urdf_generation.py` holds the MJCF and URDF to
+per-joint and full-kinematic-chain parity.
 
 ## What makes it the *Anvil* OpenARM 2.0
 
@@ -234,6 +237,8 @@ at left +q exactly equals right -q).
 
 ```
 upstream/openarm_mujoco/   git submodule: enactic/openarm_mujoco (pristine)
+upstream/openarm_description/  git submodule: enactic/openarm_description
+                           (pristine); source for the generated URDF
 upstream/anvil_loader/     git submodule: anvil-robotics/anvil-loader;
                            OpenArm v2 runtime profile YAML source
 anvil_openarm_spec.py      shared local spec constants used by generation,
@@ -253,6 +258,8 @@ scripts/
   make_anvil_model.py      derives models/ from upstream; the Anvil delta
                            lives here, replacements fail loudly if upstream
                            changes shape
+  make_anvil_urdf.py       same idea for the URDF: derives it from the
+                           openarm_description submodule with the same spec
   check_model.py           validates ranges/ctrlranges/keyframes/stability
   view.py                  open a model in an interactive viewer
   demo_wrist_sweep.py      sweep both wrists through the Anvil ranges
@@ -270,7 +277,9 @@ docker/
 
 ```bash
 git -C upstream/openarm_mujoco pull origin master
+git -C upstream/openarm_description pull origin main
 uv run python scripts/make_anvil_model.py   # fails loudly on layout drift
+uv run python scripts/make_anvil_urdf.py    # likewise for the URDF
 uv run python scripts/check_model.py
 ```
 
@@ -465,6 +474,7 @@ programmatic control
 - Anvil IK and controls overview: <https://docs.anvil.bot/software/system-overview/inverse-kinematics-and-controls>
 - Upstream MJCF: <https://github.com/enactic/openarm_mujoco> (Apache-2.0)
 - Standard v2 description (URDF configs): <https://github.com/enactic/openarm_description>
+  (Apache-2.0; vendored as the `upstream/openarm_description` submodule)
 
 Upstream content is Copyright Enactic, Inc., Apache License 2.0 (see the
 submodule's `LICENSE`); the generated models in `models/` are derivative works
