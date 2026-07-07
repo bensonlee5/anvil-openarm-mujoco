@@ -6,9 +6,17 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from anvil_openarm_spec import (  # noqa: E402
+    WRIST_BRACKET_MESH_ASSET,
+    WRIST_BRACKET_MESH_REF,
+)
 MODELS = ROOT / "models"
 UPSTREAM_V2 = ROOT / "upstream" / "openarm_mujoco" / "v2"
 ANVIL_LOADER_CONFIGS = ROOT / "upstream" / "anvil_loader" / "config"
@@ -258,6 +266,14 @@ def main() -> int:
     OUT.mkdir(parents=True)
 
     shutil.copytree(UPSTREAM_V2 / "assets", OUT / "assets")
+    # The CAD-derived bracket mesh lives in models/assets/; place it in the
+    # web asset tree and point the exported XML at the relocated copy.
+    bracket_mesh = MODELS / "assets" / WRIST_BRACKET_MESH_ASSET
+    if not bracket_mesh.is_file():
+        raise SystemExit(
+            f"missing generated mesh {bracket_mesh}; run scripts/make_anvil_model.py"
+        )
+    shutil.copy2(bracket_mesh, OUT / "assets" / WRIST_BRACKET_MESH_ASSET)
     preview = ROOT / "upstream" / "openarm_mujoco" / "media" / "v2.png"
     if preview.is_file():
         shutil.copy2(preview, OUT / "preview.png")
@@ -265,7 +281,9 @@ def main() -> int:
     rewrite_model_xml(
         MODELS / "anvil_openarm_bimanual.xml",
         OUT / "anvil_openarm_bimanual.xml",
-        {},
+        {
+            f'file="{WRIST_BRACKET_MESH_REF}"': f'file="{WRIST_BRACKET_MESH_ASSET}"',
+        },
     )
     rewrite_model_xml(
         MODELS / "anvil_pedestal.xml",

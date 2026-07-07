@@ -30,10 +30,19 @@ from anvil_openarm_spec import (  # noqa: E402
     PATCHED_XML_RANGES,
     TCP_SITE_NAMES,
     TCP_SITE_XML,
-    WRIST_BRACKET_BOXES,
+    WRIST_BRACKET_LINK5_CYLINDERS,
     WRIST_BRACKET_MATERIAL,
+    WRIST_BRACKET_MESH_ASSET,
     WRIST_BRACKET_MESH_NAMES,
+    WRIST_BRACKET_MESH_REF,
+    WRIST_BRACKET_MESH_SCALES,
+    WRIST_BRACKET_MESH_SOURCE,
     WRIST_BRACKET_RGBA,
+    WRIST_BRACKET_SCREW_CYLINDERS,
+    WRIST_BRACKET_SCREW_MATERIAL,
+    WRIST_BRACKET_SCREW_RGBA,
+    wrist_bracket_link5_geom_names,
+    wrist_bracket_screw_geom_names,
 )
 
 UPSTREAM = ROOT / "upstream" / "openarm_mujoco" / "v2"
@@ -58,64 +67,93 @@ def tcp_site(side: str) -> str:
     return f'<site name="{TCP_SITE_NAMES[side]}" {TCP_SITE_XML} />'
 
 
-# ── Wrist bracket (inline meshes) ─────────────────────────────────────────────
-# The red Anvil 2.0 C-bracket from the docs photo, as one visual-only inline
-# mesh per side: disjoint cuboids from WRIST_BRACKET_BOXES, in the link6 frame
-# (the gimbal body spanning J6 -> J7). The right side mirrors y with reversed
-# face winding so the normals stay outward.
+# ── Wrist bracket (CAD STL mesh + fastener/standoff cylinders) ───────────────
+# The bare-aluminum Anvil 2.0 wrist support bracket. The solid comes from the
+# user-authored hardware CAD (cad/anvil_openarm2_wrist_bracket_source.step),
+# placed into the LEFT link6 frame and exported to an STL by
+# cad/anvil_wrist_bracket.py; the generator copies that STL into
+# models/assets/ and references it as a mesh asset per side, mirroring y for
+# the right arm via a negative mesh scale (the upstream v2 mesh convention).
+# Dark screw heads (link6) and the forearm-side pivot standoff (link5) stay
+# parametric cylinder geoms.
 
-_BOX_FACES = [
-    (0, 2, 1), (0, 3, 2),  # -z
-    (4, 5, 6), (4, 6, 7),  # +z
-    (0, 1, 5), (0, 5, 4),  # -y
-    (2, 3, 7), (2, 7, 6),  # +y
-    (0, 4, 7), (0, 7, 3),  # -x
-    (1, 2, 6), (1, 6, 5),  # +x
-]
+BRACKET_SRC_MESH = ROOT / WRIST_BRACKET_MESH_SOURCE
 
 
-def _bracket_mesh_data(mirror_y: bool) -> tuple[list[float], list[int]]:
-    verts: list[float] = []
-    faces: list[int] = []
-    sy = -1.0 if mirror_y else 1.0
-    for (cx, cy, cz), (hx, hy, hz) in WRIST_BRACKET_BOXES:
-        base = len(verts) // 3
-        for dz in (-hz, hz):
-            for dx, dy in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)):
-                verts += [cx + dx, sy * (cy + dy), cz + dz]
-        for a, b, c in _BOX_FACES:
-            if mirror_y:
-                faces += [base + a, base + c, base + b]  # flip winding
-            else:
-                faces += [base + a, base + b, base + c]
-    return verts, faces
+def copy_bracket_mesh(out_dir: Path, verbose: bool = True) -> bool:
+    if not BRACKET_SRC_MESH.is_file():
+        print(
+            f"ERROR: bracket mesh not found: {BRACKET_SRC_MESH}\n"
+            "Regenerate it from cad/anvil_wrist_bracket.py with the CAD "
+            "skill tooling (STEP + --stl sidecar)."
+        )
+        return False
+    out_path = out_dir / "assets" / WRIST_BRACKET_MESH_ASSET
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(BRACKET_SRC_MESH.read_bytes())
+    if verbose:
+        try:
+            shown = out_path.relative_to(ROOT)
+        except ValueError:
+            shown = out_path
+        print(f"wrote {shown} (copied from {WRIST_BRACKET_MESH_SOURCE})")
+    return True
 
 
 def _fmt(values: list[float]) -> str:
-    return " ".join(f"{v:.6g}" for v in values)
+    return " ".join(f"{v + 0.0:.6g}" for v in values)  # + 0.0 normalises -0.0
 
 
 def bracket_assets() -> str:
     rgba = _fmt(list(WRIST_BRACKET_RGBA))
+    screw_rgba = _fmt(list(WRIST_BRACKET_SCREW_RGBA))
     lines = [
         f'<material name="{WRIST_BRACKET_MATERIAL}" rgba="{rgba}" '
-        'specular="0.4" shininess="0.3" />'
+        'specular="1.0" shininess="0.9" reflectance="0.8" />',
+        f'<material name="{WRIST_BRACKET_SCREW_MATERIAL}" rgba="{screw_rgba}" '
+        'specular="0.35" shininess="0.45" />',
     ]
-    for side, mirror in (("l", False), ("r", True)):
-        verts, faces = _bracket_mesh_data(mirror)
+    for side in ("l", "r"):
         lines.append(
             f'<mesh name="{WRIST_BRACKET_MESH_NAMES[side]}" '
-            f'vertex="{_fmt(verts)}" face="{" ".join(str(i) for i in faces)}" />'
+            f'file="{WRIST_BRACKET_MESH_REF}" '
+            f'scale="{WRIST_BRACKET_MESH_SCALES[side]}" />'
         )
     return "\n    ".join(lines)
 
 
-def bracket_geom(side: str) -> str:
-    mesh = WRIST_BRACKET_MESH_NAMES[side]
+def _cylinder_geom(name: str, start, end, radius: float, side: str, material: str) -> str:
+    sy = 1.0 if side == "l" else -1.0
+    fromto = _fmt([start[0], sy * start[1], start[2], end[0], sy * end[1], end[2]])
     return (
+        f'<geom name="{name}" type="cylinder" fromto="{fromto}" '
+        f'size="{radius:.6g}" class="visual" material="{material}" />'
+    )
+
+
+def bracket_geom(side: str) -> str:
+    """All bracket geoms — mesh, screw heads, forearm standoff — for the
+    link5 (forearm) body of one side."""
+    mesh = WRIST_BRACKET_MESH_NAMES[side]
+    lines = [
         f'<geom name="{mesh}" type="mesh" mesh="{mesh}" class="visual" '
         f'material="{WRIST_BRACKET_MATERIAL}" />'
-    )
+    ]
+    screw_names = wrist_bracket_screw_geom_names(side)
+    for key, (start, end, radius) in WRIST_BRACKET_SCREW_CYLINDERS.items():
+        lines.append(
+            _cylinder_geom(
+                screw_names[key], start, end, radius, side, WRIST_BRACKET_SCREW_MATERIAL
+            )
+        )
+    standoff_names = wrist_bracket_link5_geom_names(side)
+    for key, (start, end, radius) in WRIST_BRACKET_LINK5_CYLINDERS.items():
+        lines.append(
+            _cylinder_geom(
+                standoff_names[key], start, end, radius, side, WRIST_BRACKET_MATERIAL
+            )
+        )
+    return "\n                ".join(lines)
 
 
 # fname -> list of (pattern, replacement); each must match exactly once.
@@ -178,25 +216,27 @@ FILES: dict[str, dict] = {
                 '<site name="right_ee_control_point" pos="0.0 0.0 0.0" size="0.01" rgba="1 0 0 1" />\n'
                 f"                    {tcp_site('r')}",
             ),
-            # Anvil wrist bracket: red material + one inline mesh per side,
-            # attached to the link6 gimbal bodies (visual-only).
+            # Anvil wrist bracket: aluminum/fastener materials, plus all
+            # bracket geoms (CAD STL mesh, dark screw heads, forearm pivot
+            # standoff) on the link5 forearm bodies, visual-only. The bracket
+            # is rigid to the forearm; its bearing lug sits on the J6 axis.
             literal(
                 "</asset>",
                 f"  {bracket_assets()}\n  </asset>",
             ),
             literal(
-                '<geom name="link6_left_collision_00" type="mesh" '
-                'mesh="link6_left_collision_00" class="collision" />',
-                '<geom name="link6_left_collision_00" type="mesh" '
-                'mesh="link6_left_collision_00" class="collision" />\n'
-                f"                  {bracket_geom('l')}",
+                '<geom name="link5_left_collision_02" type="mesh" '
+                'mesh="link5_left_collision_02" class="collision" />',
+                '<geom name="link5_left_collision_02" type="mesh" '
+                'mesh="link5_left_collision_02" class="collision" />\n'
+                f"                {bracket_geom('l')}",
             ),
             literal(
-                '<geom name="link6_right_collision_00" type="mesh" '
-                'mesh="link6_right_collision_00" class="collision" />',
-                '<geom name="link6_right_collision_00" type="mesh" '
-                'mesh="link6_right_collision_00" class="collision" />\n'
-                f"                  {bracket_geom('r')}",
+                '<geom name="link5_right_collision_02" type="mesh" '
+                'mesh="link5_right_collision_02" class="collision" />',
+                '<geom name="link5_right_collision_02" type="mesh" '
+                'mesh="link5_right_collision_02" class="collision" />\n'
+                f"                {bracket_geom('r')}",
             ),
         ],
     },
@@ -220,8 +260,9 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 
 Derived from upstream/openarm_mujoco/v2/{src} (enactic/openarm_mujoco,
 Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP sites, plus the stylised red Anvil
-wrist bracket (visual-only inline meshes on the link6 bodies).
+J6 -45..+70 deg, follower hand TCP sites, plus the Anvil wrist support
+bracket from user hardware CAD (visual-only STL meshes on the link6 bodies,
+with fastener and forearm-standoff cylinder details).
 -->
 """
 
@@ -285,6 +326,9 @@ def generate(out_dir: Path = OUT, verbose: bool = True) -> int:
         print("Run: git submodule update --init")
         return 1
     out_dir.mkdir(exist_ok=True)
+
+    if not copy_bracket_mesh(out_dir, verbose=verbose):
+        return 1
 
     for src_name, spec in FILES.items():
         src = UPSTREAM / src_name
