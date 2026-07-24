@@ -2,12 +2,13 @@
 """Generate Anvil OpenARM 2.0 MJCF models from the upstream OpenArm v2 files.
 
 Reads the standard OpenArm v2 models from the upstream/openarm_mujoco
-submodule and writes Anvil-variant copies into models/, applying this repo's
-local Anvil pre-arrival joint-limit spec:
+submodule and writes Anvil-variant copies into models/, applying the measured
+Anvil controller-coordinate wrist limits:
 
-  - J1: -135 deg .. +135 deg   (upstream: -80 .. +200 in MJCF sign convention)
-  - J6: -45 deg .. +70 deg     (upstream: -45 .. +45); the +25 deg is on the
-                                radial-deviation (+) side
+  - left J6:  -45 deg .. +70 deg
+  - right J6: -70 deg .. +45 deg
+
+All other ranges, including the asymmetric J1 and J2 limits, remain upstream.
 
 The generated bimanual model also exposes follower_{l,r}_hand_tcp sites using
 the upstream OpenArm v2 pinch-gripper grasp frame.
@@ -125,29 +126,8 @@ FILES: dict[str, dict] = {
         "subs": [
             literal('<mujoco model="openarm_v20">', '<mujoco model="anvil_openarm_v20">'),
             literal(MESHDIR_OLD, MESHDIR_NEW),
-            # J1: symmetric +/-135 deg on both arms
-            attr_sub(
-                "openarm_left_joint1",
-                "range",
-                PATCHED_XML_RANGES[("openarm_left_joint1", "range")],
-            ),
-            attr_sub(
-                "openarm_right_joint1",
-                "range",
-                PATCHED_XML_RANGES[("openarm_right_joint1", "range")],
-            ),
-            attr_sub(
-                "left_joint1_ctrl",
-                "ctrlrange",
-                PATCHED_XML_RANGES[("left_joint1_ctrl", "ctrlrange")],
-            ),
-            attr_sub(
-                "right_joint1_ctrl",
-                "ctrlrange",
-                PATCHED_XML_RANGES[("right_joint1_ctrl", "ctrlrange")],
-            ),
-            # J6: -45..+70 deg; identical numbers on both arms because the
-            # upstream axes are mirrored (left "0 -1 0", right "0 1 0")
+            # J6: the wider radial/ulnar direction is sign-mirrored in the
+            # controller coordinates used by the real session data.
             attr_sub(
                 "openarm_left_joint6",
                 "range",
@@ -219,9 +199,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
     uv run python scripts/make_anvil_model.py
 
 Derived from upstream/openarm_mujoco/v2/{src} (enactic/openarm_mujoco,
-Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP sites, plus the stylised red Anvil
-wrist bracket (visual-only inline meshes on the link6 bodies).
+Apache-2.0) with Anvil OpenARM 2.0 controller-coordinate wrist limits:
+left J6 -45..+70 deg, right J6 -70..+45 deg, follower hand TCP sites, plus
+the stylised red Anvil wrist bracket (visual-only inline meshes on the link6
+bodies).
 -->
 """
 

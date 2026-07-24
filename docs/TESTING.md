@@ -82,8 +82,8 @@ Expected result:
 - Every arm joint range and actuator ctrlrange matches `anvil_openarm_spec.py`.
 - Both TCP sites exist and match the upstream OpenArm v2 grasp-frame transform.
 - `pytest` passes in the Python container.
-- The wrist sweep reaches approximately J6 -45..+70 degrees and J7 +/-90
-  degrees.
+- The wrist sweep reaches approximately left J6 -45..+70 degrees, right J6
+  -70..+45 degrees, and J7 +/-90 degrees on both arms.
 - The web build exports hosted assets and builds the Vite app.
 - The viewer smoke test builds the Linux viewer image and keeps the official
   MuJoCo viewer alive under Xvfb until the expected timeout.
@@ -341,9 +341,10 @@ With a physical robot, validate sim parity conservatively:
    ordering.
 3. Move one joint by a few degrees from its current position and verify the
    same client command behaves similarly in sim and hardware.
-4. Sweep J6 slowly toward the local spec limits: -45 degrees and +70 degrees.
-   If your unit reaches a different limit, update `anvil_openarm_spec.py`,
-   regenerate, and re-run this guide.
+4. Sweep J6 slowly toward the session-resolved controller limits: left
+   -45..+70 degrees and right -70..+45 degrees. If your unit reaches a
+   different limit, update `anvil_openarm_spec.py`, regenerate, and re-run
+   this guide.
 5. Bag comparable sim and hardware runs:
    ```bash
    ros2 bag record /joint_states /ee_pose_left /ee_pose_right
@@ -364,7 +365,7 @@ With a physical robot, validate sim parity conservatively:
   working. Send continuous small target updates as Quest teleop does.
 - If generated models fail reproducibility, run `scripts/run_docker.sh
   generate` and inspect the XML diff.
-- If hardware limits differ from the local pre-arrival spec, update
+- If hardware limits differ from the session-resolved local spec, update
   `anvil_openarm_spec.py`; do not hand-edit generated XML.
 
 ## References

@@ -6,8 +6,8 @@ extended-range wrist.
 
 **Unofficial project.** This repository is not affiliated with, endorsed by, or
 supported by Anvil Robotics. It attempts to approximate Anvil's OpenARM 2.0
-model and custom IK/control behavior from public docs plus the local
-pre-arrival spec in this repo. In particular, the `/commanded_ee_*` path is an
+model and custom IK/control behavior from public docs plus the session-resolved
+local spec in this repo. In particular, the `/commanded_ee_*` path is an
 SDLS-style MuJoCo approximation of Anvil's custom IK solver and likely has
 implementation differences from Anvil's hardware stack.
 
@@ -172,31 +172,32 @@ per-joint and full-kinematic-chain parity.
 
 The live Anvil docs describe the OpenARM 2.0 wrist swap and a wider J6
 radial/ulnar deviation range
-([docs](https://docs.anvil.bot/introduction/openarm-2.0)); the comparison
-table is published there as an image. The local numeric spec below matches
-that table exactly (verified against the docs 2026-07-05) and is kept in
-machine-readable form here until the hardware can be measured or Anvil
-publishes machine-readable limits:
+([docs](https://docs.anvil.bot/introduction/openarm-2.0)), but do not publish a
+machine-readable numeric controller contract. The side-specific signs below
+are resolved from follower state in all 33 sessions of
+`bohlt/openarm2-shirt-fold-phase-aligned-v1@8411e3e85eaf3e482b4ccb1cac9d4fc02891305e`:
+right J6 reaches
+-70.30° and left J6 reaches +63.46°. The nominal 70° envelope treats the
+small encoder overrun as calibration/tolerance rather than expanding the
+mechanical limit.
 
-| Joint | Anvil OpenARM 1.0 | Standard OpenARM 2.0 | **Anvil OpenARM 2.0** |
-|---|---|---|---|
-| J1 | -135° to +135° | -200° to +80° | **-135° to +135°** |
-| J2 | -190° to +10° | -190° to +10° | -190° to +10° |
-| J3 | -90° to +90° | -90° to +90° | -90° to +90° |
-| J4 | 0° to 140° | 0° to 140° | 0° to 140° |
-| J5 | -90° to +90° | -90° to +90° | -90° to +90° |
-| J6 (radial/ulnar deviation) | -45° to +45° (flex/ext in 1.0) | -45° to +45° | **-45° to +70°** |
-| J7 (flexion/extension) | -90° to +90° (deviation in 1.0) | -90° to +90° | -90° to +90° |
-| Gripper | -45° to 0° | -45° to 0° | -45° to 0° |
+| Joint | Left controller range | Right controller range | Source |
+|---|---:|---:|---|
+| J1 | -200° to +80° | -80° to +200° | upstream OpenARM 2.0 |
+| J2 | -190° to +10° | -10° to +190° | upstream OpenARM 2.0 |
+| J3 | -90° to +90° | -90° to +90° | upstream OpenARM 2.0 |
+| J4 | 0° to 140° | 0° to 140° | upstream OpenARM 2.0 |
+| J5 | -90° to +90° | -90° to +90° | upstream OpenARM 2.0 |
+| J6 (radial/ulnar deviation) | **-45° to +70°** | **-70° to +45°** | Anvil sessions |
+| J7 (flexion/extension) | -90° to +90° | -90° to +90° | upstream OpenARM 2.0 |
 
 The upstream v2 model already contains the OpenARM 2.0 wrist swap (J6 =
-deviation, J7 = flexion/extension). The generator applies the two Anvil
-deltas on both arms, to joint `range` and actuator `ctrlrange`:
+deviation, J7 = flexion/extension). The generator changes J6 only, applying
+the side-specific range to both joint `range` and actuator `ctrlrange`:
 
-- **J6: -45° to +70°** — the extra +25° of deviation enabled by Anvil's
-  wrist bracket
-- **J1: ±135°** — per the local spec (standard v2 uses -80°..+200° in MJCF
-  sign convention)
+- **left J6: -45° to +70°; right J6: -70° to +45°** — the wider direction is
+  sign-mirrored in the controller coordinates recorded by the real robot
+- **J1 and every other non-J6 joint remain upstream**
 - **TCP sites** — `follower_l_hand_tcp` and `follower_r_hand_tcp`, using the
   upstream OpenArm v2 pinch-gripper grasp-frame transform so `/ee_pose_*`
   represents the end-effector TCP rather than the gripper base.
@@ -211,14 +212,12 @@ deltas on both arms, to joint `range` and actuator `ctrlrange`:
 
 ### Sign conventions, verified
 
-The numeric spec is written in the convention that matches the upstream MJCF
-*left*-arm numerics exactly — verified on both asymmetric joints
-(J1: spec "-200..+80" = left `range="-3.4907 1.3963"`; J2: spec "-190..+10"
-= left `range="-3.3161 0.17453"`). J6's "-45..+70" therefore maps to
-`range="-0.7854 1.2217"` on the left arm. Upstream encodes left/right
-mirroring for J6 as *flipped axis + identical numeric range*, so the right arm
-gets the same numbers; this was confirmed numerically (fingertip displacement
-at left +q exactly equals right -q).
+The numeric spec uses controller coordinates and matches upstream MJCF and
+URDF numerics directly. J1 and J2 are already side-specific upstream. The
+session evidence shows that J6 must also be side-specific: left
+`range="-0.7854 1.2217"`, right `range="-1.2217 0.7854"`. Geometry remains
+mirrored through the upstream joint axes; action and state values are never
+silently sign-flipped.
 
 ## Layout
 
@@ -380,7 +379,7 @@ behavior, ROS topics, Quest teleop, and eventual hardware comparison is in
 | ROS 2 bridge runtime in Docker | `scripts/run_docker.sh ros-bridge --ros-args -p time_scale:=1.0` | Docker |
 | ROS 2 bridge integration tests (topics publish, joint and commanded-EE commands move the arm, limits clamp, malformed commands rejected) | `scripts/run_docker.sh ros-test` | Docker |
 | Official MuJoCo viewer container smoke test | `scripts/run_docker.sh viewer-smoke` | Docker |
-| Wrist range-of-motion evidence (both arms achieve J6 −45°..+70°, J7 ±90° under position control) | `uv run python scripts/demo_wrist_sweep.py --headless` | nothing extra |
+| Wrist range-of-motion evidence (left J6 −45°..+70°, right J6 −70°..+45°, J7 ±90°) | `uv run python scripts/demo_wrist_sweep.py --headless` | nothing extra |
 | Eyeball QA | `uv run python scripts/view.py`, `uv run python scripts/demo_wrist_sweep.py` | display |
 
 The Docker suite builds focused targets for Python checks, the hosted web demo,
@@ -415,9 +414,8 @@ programmatic control
    from the current one — the real controller does not interpolate for you.
 4. **Joint-limit conformance** (the point of this repo): slowly step J6
    toward each limit on one arm. The real Anvil 2.0 wrist should reach
-   ≈ +70° of deviation and stop; the sim clamps at exactly +70°. If your
-   unit reaches a different limit (e.g. a standard v2 wrist at ±45°, or a
-   J1 range of −80°..+200° instead of ±135°), update
+   approximately +70° on the left and -70° on the right; the sim clamps at
+   those nominal limits. If your unit reaches a different limit, update
    `scripts/make_anvil_model.py` and regenerate so sim matches your
    hardware.
 5. **Record and compare**: `ros2 bag record /joint_states` during a scripted
@@ -438,11 +436,9 @@ programmatic control
   wrist meshes and eyeballed against the docs photo — it is not Anvil's CAD
   and takes part in no collision. Joint frame positions are assumed unchanged
   from standard v2 — Anvil describes the change as range-of-motion only.
-- **J1 = ±135° follows this repo's local pre-arrival spec.** Anvil's public
-  `openarm_description` repository and upstream standard v2 allow
-  -80°..+200° for J1, so ±135° may be an operational rather than mechanical
-  limit. If hardware measurement shows the wider range, update
-  `anvil_openarm_spec.py` and regenerate.
+- **J6 bounds are session-resolved nominal limits.** The 33-session dataset
+  is treated as representative, but it is not a hard-stop calibration test.
+  Re-run the range audit if controller offsets or robot firmware change.
 - **Cartesian EE commands are approximate.** `/commanded_ee_*` on real
   hardware invokes Anvil's IK stack. The sim accepts the topics for Quest
   teleop compatibility, but resolves them with local SDLS-style IK against the

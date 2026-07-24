@@ -82,6 +82,15 @@ def test_patched_limits_match_spec():
         assert float(limit.get("upper")) == pytest.approx(hi, abs=TOL)
 
 
+def test_session_resolved_j6_limits_are_mirrored_in_controller_coordinates():
+    assert spec.SIDE_JOINT_RANGES["openarm_left_joint6"] == pytest.approx(
+        (-45 * spec.DEG, 70 * spec.DEG)
+    )
+    assert spec.SIDE_JOINT_RANGES["openarm_right_joint6"] == pytest.approx(
+        (-70 * spec.DEG, 45 * spec.DEG)
+    )
+
+
 def test_joint_parity_with_mjcf():
     """Every named joint agrees with the generated MJCF: axis and range."""
     model = mujoco.MjModel.from_xml_path(str(MJCF_PATH))

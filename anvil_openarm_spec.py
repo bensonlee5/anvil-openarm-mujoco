@@ -1,9 +1,14 @@
 """Shared Anvil OpenARM 2.0 model constants.
 
 The live Anvil OpenARM 2.0 page documents the wrist swap and wider J6
-radial/ulnar deviation qualitatively. The numeric limits here are the local
-pre-arrival spec this repo validates against until hardware measurements can
-confirm or correct them.
+radial/ulnar deviation qualitatively.  The side-specific J6 signs below are
+resolved in the real controller coordinate convention from 33 Anvil shirt-fold
+sessions (``bohlt/openarm2-shirt-fold-phase-aligned-v1@``
+``8411e3e85eaf3e482b4ccb1cac9d4fc02891305e``): follower state reaches -70.30
+degrees on the right and +63.46 degrees on the left.
+
+The Anvil wrist change is the only joint-range delta from the upstream OpenARM
+2.0 descriptions.  All non-J6 limits therefore stay byte-for-byte upstream.
 """
 
 import math
@@ -39,41 +44,39 @@ WORLD_FRAME = "world"
 SIDE_PREFIX = {"l": "openarm_left_", "r": "openarm_right_"}
 SIDE_ACT_PREFIX = {"l": "left_", "r": "right_"}
 
-# Symmetric-per-arm joint ranges, in radians. These have identical numeric
-# ranges on both arms because the upstream MJCF mirrors joint axes where needed.
+# Symmetric-per-arm joint ranges, in radians.
 ARM_JOINT_RANGES = {
-    "joint1": (-135 * DEG, 135 * DEG),
     "joint3": (-90 * DEG, 90 * DEG),
     "joint4": (0.0, 140 * DEG),
     "joint5": (-90 * DEG, 90 * DEG),
-    "joint6": (-45 * DEG, 70 * DEG),
     "joint7": (-90 * DEG, 90 * DEG),
 }
 
-# J2 is asymmetric and sign-mirrored between arms in the upstream convention.
+# Controller-coordinate ranges that differ by side. J1 and J2 retain the
+# upstream OpenARM 2.0 limits. Anvil's extra 25 degrees of J6 radial/ulnar
+# deviation mirrors sign with the physical arm: positive on the left and
+# negative on the right.
 SIDE_JOINT_RANGES = {
+    "openarm_left_joint1": (-200 * DEG, 80 * DEG),
+    "openarm_right_joint1": (-80 * DEG, 200 * DEG),
     "openarm_left_joint2": (-190 * DEG, 10 * DEG),
     "openarm_right_joint2": (-10 * DEG, 190 * DEG),
+    "openarm_left_joint6": (-45 * DEG, 70 * DEG),
+    "openarm_right_joint6": (-70 * DEG, 45 * DEG),
 }
 
 PATCHED_CTRLRANGES = {
-    "left_joint1_ctrl": ARM_JOINT_RANGES["joint1"],
-    "right_joint1_ctrl": ARM_JOINT_RANGES["joint1"],
-    "left_joint6_ctrl": ARM_JOINT_RANGES["joint6"],
-    "right_joint6_ctrl": ARM_JOINT_RANGES["joint6"],
+    "left_joint6_ctrl": SIDE_JOINT_RANGES["openarm_left_joint6"],
+    "right_joint6_ctrl": SIDE_JOINT_RANGES["openarm_right_joint6"],
 }
 
 # Number formatting mirrors upstream XML precision: 5 sig figs in range= and
 # 6 in ctrlrange= for the attributes patched by the generator.
 PATCHED_XML_RANGES = {
-    ("openarm_left_joint1", "range"): "-2.3562 2.3562",
-    ("openarm_right_joint1", "range"): "-2.3562 2.3562",
-    ("left_joint1_ctrl", "ctrlrange"): "-2.35619 2.35619",
-    ("right_joint1_ctrl", "ctrlrange"): "-2.35619 2.35619",
     ("openarm_left_joint6", "range"): "-0.7854 1.2217",
-    ("openarm_right_joint6", "range"): "-0.7854 1.2217",
+    ("openarm_right_joint6", "range"): "-1.2217 0.7854",
     ("left_joint6_ctrl", "ctrlrange"): "-0.785398 1.22173",
-    ("right_joint6_ctrl", "ctrlrange"): "-0.785398 1.22173",
+    ("right_joint6_ctrl", "ctrlrange"): "-1.22173 0.785398",
 }
 
 # URDF <limit lower="..." upper="..."> values for the same patched joints.
@@ -84,8 +87,6 @@ PATCHED_XML_RANGES = {
 PATCHED_URDF_LIMITS = {
     name: tuple(PATCHED_XML_RANGES[(name, "range")].split())
     for name in (
-        "openarm_left_joint1",
-        "openarm_right_joint1",
         "openarm_left_joint6",
         "openarm_right_joint6",
     )

@@ -62,17 +62,23 @@ def test_joint_states_shape(sim):
 
 
 def test_command_clamps_to_anvil_ranges(sim):
-    # J6 commanded far beyond +70 deg must clamp to the Anvil limit
+    # Left J6's wider positive direction clamps at +70 deg.
     cmd = [0.0] * 8
     cmd[5] = 2.0  # rad, > 1.2217
     applied = sim.command_side("l", cmd)
     assert applied[5] == pytest.approx(70 * DEG, abs=1e-3)
 
-    # J1 commanded beyond -135 deg must clamp
+    # Right J6 mirrors the wider direction and clamps at -70 deg.
+    cmd = [0.0] * 8
+    cmd[5] = -2.0
+    applied = sim.command_side("r", cmd)
+    assert applied[5] == pytest.approx(-70 * DEG, abs=1e-3)
+
+    # Non-wrist joints retain the upstream asymmetric limits.
     cmd = [0.0] * 8
     cmd[0] = -3.0
     applied = sim.command_side("r", cmd)
-    assert applied[0] == pytest.approx(-135 * DEG, abs=1e-3)
+    assert applied[0] == pytest.approx(-80 * DEG, abs=1e-3)
 
 
 def test_command_length_validation(sim):
@@ -93,18 +99,19 @@ def test_position_command_converges(sim):
 
 
 def test_extended_j6_reachable_and_limited(sim):
-    # command J6 to the Anvil max on both arms and hold
-    for side in ("l", "r"):
+    # Command each J6 into its wider, sign-mirrored direction and hold.
+    targets = {"l": 70 * DEG, "r": -70 * DEG}
+    for side, target in targets.items():
         cmd = [0.0] * 8
-        cmd[5] = 70 * DEG
+        cmd[5] = target
         sim.command_side(side, cmd)
     sim.step(seconds=3.0)
     names, qpos, _, _ = sim.joint_states()
-    for jname in ("openarm_left_joint6", "openarm_right_joint6"):
+    for side, target in targets.items():
+        jname = f"openarm_{'left' if side == 'l' else 'right'}_joint6"
         q = qpos[names.index(jname)]
-        assert q == pytest.approx(70 * DEG, abs=3 * DEG)
-        # never past the mechanical limit
-        assert q <= 70 * DEG + 1e-3
+        assert q == pytest.approx(target, abs=3 * DEG)
+        assert abs(q) <= 70 * DEG + 1e-3
 
 
 def test_time_advances(sim):
