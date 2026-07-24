@@ -161,7 +161,7 @@ scripts/run_docker.sh viewer-smoke
 |---|---|
 | `models/anvil_openarm_bimanual.xml` | the bimanual arm + grippers, no scene |
 | `models/anvil_pedestal.xml` | arm on a pedestal with floor and lighting |
-| `models/anvil_openarm_bimanual.urdf` | the same bimanual arm as URDF (for Isaac/URDF consumers), derived from `enactic/openarm_description` with the same Anvil deltas |
+| `models/assets/anvil_wrist_bracket.stl` | wrist support bracket mesh, copied from the CAD export `cad/anvil_wrist_bracket.stl` (source: `cad/anvil_openarm2_wrist_bracket_source.step` via `cad/anvil_wrist_bracket.py`) |
 
 All are **generated files** — edit `scripts/make_anvil_model.py` /
 `scripts/make_anvil_urdf.py` (or upstream) and regenerate rather than editing
@@ -201,14 +201,27 @@ the side-specific range to both joint `range` and actuator `ctrlrange`:
 - **TCP sites** — `follower_l_hand_tcp` and `follower_r_hand_tcp`, using the
   upstream OpenArm v2 pinch-gripper grasp-frame transform so `/ee_pose_*`
   represents the end-effector TCP rather than the gripper base.
-- **The red wrist bracket** — the C-bracket shown on the Anvil variant in the
-  docs photo (it clamps the J6 rotor hub and lands on a plate bolted to the
-  J7 motor end cap; it is the part that enables the extra +25 deg of
-  deviation). Stock v2 meshes don't include it, so the generator emits a
-  stylised **visual-only** approximation as inline MJCF meshes (one mirrored
-  mesh per side, `anvil_wrist_bracket_{left,right}`) attached to the `link6`
-  gimbal bodies. Dimensions live in `anvil_openarm_spec.WRIST_BRACKET_BOXES`
-  and are validated by `scripts/check_model.py`.
+- **The wrist support bracket** — the machined-aluminum part that enables the
+  extra +25 deg of deviation: two lap-jointed arm plates with pivot lugs
+  80 mm apart, an integral spacer under the strap-side lug, and a strap
+  ending in a two-bolt foot. It spans the J5 and J6 actuators and is rigid
+  to the **forearm** (`link5`): the foot bolts into the J6 motor case, the
+  far lug pivots on a forearm standoff, and the strap-side lug is an
+  outboard bearing seat on the J6 axis — the gimbal shaft rotates within it,
+  so the bracket stays visually connected at both ends for any joint angle.
+  The geometry is authored hardware CAD
+  (`cad/anvil_openarm2_wrist_bracket_source.step`); the placement wrapper
+  `cad/anvil_wrist_bracket.py` maps it into the LEFT `link5` frame (bearing
+  lug bore on the J6 axis at `link5` z −0.1205, spacer flush on the gimbal
+  hub face) and exports the STL the generator ships as **visual-only** mesh
+  assets (`anvil_wrist_bracket_{left,right}`, the right arm mirrored in y
+  via a negative mesh scale), plus dark screw-head cylinders and the forearm
+  standoff cylinder, all on the `link5` bodies. The mesh reference/AABB and
+  cylinder specs live in `anvil_openarm_spec.WRIST_BRACKET_*` and are
+  validated by `scripts/check_model.py` (including the bearing lug sitting
+  exactly on the J6 axis). To change the bracket, edit the source STEP in
+  CAD, re-export `cad/anvil_wrist_bracket.stl` via the wrapper, update
+  `WRIST_BRACKET_MESH_AABB`, and regenerate the models.
 
 ### Sign conventions, verified
 
@@ -430,12 +443,16 @@ programmatic control
 
 ## Known approximations
 
-- **Meshes are stock OpenArm v2 plus a stylised bracket.** Anvil's 2.0
-  hardware adds a wrist bracket (and hard-case cabling); the bracket is
-  represented by a generated, visual-only cuboid mesh sized off the upstream
-  wrist meshes and eyeballed against the docs photo — it is not Anvil's CAD
-  and takes part in no collision. Joint frame positions are assumed unchanged
-  from standard v2 — Anvil describes the change as range-of-motion only.
+- **Meshes are stock OpenArm v2 plus the CAD wrist bracket.** Anvil's 2.0
+  hardware adds a wrist support bracket (and hard-case cabling); the bracket
+  mesh comes from hardware CAD in this repo, mounted rigid to the forearm
+  (`link5`) with its bearing lug on the J6 axis, so it tracks J5 and stays
+  visually connected across the full J6 range. Placed onto the stock v2
+  wrist (whose geometry differs from the hardware's separated actuators),
+  the foot region tucks into the link5 fork around the gimbal — it is
+  visual-only and takes part in no collision. Joint frame positions are
+  assumed unchanged from standard v2 — Anvil describes the change as
+  range-of-motion only.
 - **J6 bounds are session-resolved nominal limits.** The 33-session dataset
   is treated as representative, but it is not a hard-stop calibration test.
   Re-run the range audit if controller offsets or robot firmware change.

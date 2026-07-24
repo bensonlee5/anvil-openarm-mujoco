@@ -169,29 +169,79 @@ def test_tcp_world_pose_parity_with_mjcf():
 
 def test_wrist_bracket_visuals():
     root = urdf_root()
-    top_materials = [m for m in root.findall("material")]
-    assert [m.get("name") for m in top_materials] == [spec.WRIST_BRACKET_MATERIAL]
-    rgba = floats(top_materials[0].find("color").get("rgba"))
-    np.testing.assert_allclose(rgba, spec.WRIST_BRACKET_RGBA, atol=1e-9)
+    top_materials = {m.get("name"): m for m in root.findall("material")}
+    assert set(top_materials) == {
+        spec.WRIST_BRACKET_MATERIAL,
+        spec.WRIST_BRACKET_SCREW_MATERIAL,
+    }
+    for name, rgba in (
+        (spec.WRIST_BRACKET_MATERIAL, spec.WRIST_BRACKET_RGBA),
+        (spec.WRIST_BRACKET_SCREW_MATERIAL, spec.WRIST_BRACKET_SCREW_RGBA),
+    ):
+        got = floats(top_materials[name].find("color").get("rgba"))
+        np.testing.assert_allclose(got, rgba, atol=1e-9)
 
     links = {li.get("name"): li for li in root.findall("link")}
     for side in ("l", "r"):
         link = links[spec.WRIST_BRACKET_BODY_NAMES[side]]
         sy = -1.0 if side == "r" else 1.0
         prefix = spec.WRIST_BRACKET_MESH_NAMES[side]
-        visuals = [
-            v for v in link.findall("visual")
+        visuals = {
+            v.get("name"): v
+            for v in link.findall("visual")
             if v.get("name", "").startswith(prefix)
-        ]
-        assert len(visuals) == len(spec.WRIST_BRACKET_BOXES)
-        for i, ((cx, cy, cz), half) in enumerate(spec.WRIST_BRACKET_BOXES):
-            visual = visuals[i]
-            assert visual.get("name") == f"{prefix}_{i}"
+        }
+
+        # The CAD STL mesh, right side mirrored via a negative y scale
+        # (exactly like the MJCF mesh asset).
+        mesh_visual = visuals.pop(prefix)
+        mesh = mesh_visual.find("geometry/mesh")
+        assert mesh.get("filename") == make_anvil_urdf.BRACKET_MESH_PATH
+        np.testing.assert_allclose(
+            floats(mesh.get("scale")),
+            floats(spec.WRIST_BRACKET_MESH_SCALES[side]),
+            atol=1e-15,
+        )
+        assert mesh_visual.find("material").get("name") == spec.WRIST_BRACKET_MATERIAL
+
+        # Screw heads and forearm standoff as cylinders matching the spec
+        # ((from), (to), radius) definitions, mirrored in y.
+        expected = {
+            name: (cyl, spec.WRIST_BRACKET_SCREW_MATERIAL)
+            for name, cyl in zip(
+                spec.wrist_bracket_screw_geom_names(side).values(),
+                spec.WRIST_BRACKET_SCREW_CYLINDERS.values(),
+            )
+        }
+        expected.update(
+            {
+                name: (cyl, spec.WRIST_BRACKET_MATERIAL)
+                for name, cyl in zip(
+                    spec.wrist_bracket_link5_geom_names(side).values(),
+                    spec.WRIST_BRACKET_LINK5_CYLINDERS.values(),
+                )
+            }
+        )
+        assert set(visuals) == set(expected)
+        for name, (cylinder, material) in expected.items():
+            visual = visuals[name]
+            start, end, radius = cylinder
+            start = np.array(start) * [1.0, sy, 1.0]
+            end = np.array(end) * [1.0, sy, 1.0]
             xyz = floats(visual.find("origin").get("xyz"))
-            np.testing.assert_allclose(xyz, (cx, sy * cy, cz), atol=1e-12)
-            size = floats(visual.find("geometry/box").get("size"))
-            np.testing.assert_allclose(size, [2 * h for h in half], atol=1e-12)
-            assert visual.find("material").get("name") == spec.WRIST_BRACKET_MATERIAL
+            np.testing.assert_allclose(xyz, (start + end) / 2, atol=1e-12)
+            cyl_el = visual.find("geometry/cylinder")
+            assert float(cyl_el.get("radius")) == radius
+            length = np.linalg.norm(end - start)
+            np.testing.assert_allclose(float(cyl_el.get("length")), length, atol=1e-12)
+            # The rpy must rotate the URDF cylinder's local z onto the spec
+            # cylinder's axis.
+            rot, _ = origin_transform(visual)
+            axis = (end - start) / length
+            np.testing.assert_allclose(
+                np.abs(rot @ [0.0, 0.0, 1.0]), np.abs(axis), atol=1e-9
+            )
+            assert visual.find("material").get("name") == material
         # Visual-only, exactly like the MJCF bracket: no collision blocks.
         for coll in link.findall("collision"):
             assert not coll.get("name", "").startswith("anvil_wrist_bracket")
@@ -203,6 +253,9 @@ def test_mesh_paths_resolve():
         for m in urdf_root().iter("mesh")
     ]
     assert meshes, "expected mesh references in the URDF"
+    assert make_anvil_urdf.BRACKET_MESH_PATH in meshes
     for filename in meshes:
-        assert filename.startswith(make_anvil_urdf.MESH_PREFIX), filename
+        assert filename.startswith(
+            (make_anvil_urdf.MESH_PREFIX, "assets/")
+        ), filename
         assert (make_anvil_urdf.OUT_DIR / filename).resolve().is_file(), filename

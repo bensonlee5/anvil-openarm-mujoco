@@ -116,24 +116,76 @@ TCP_SITE_XML = (
 GRIPPER_METERS_RANGE = (-0.003, 0.05)
 
 # ── Anvil 2.0 wrist bracket ──────────────────────────────────────────────────
-# The red C-bracket shown on the Anvil variant in the OpenARM 2.0 docs photo:
-# it clamps onto the J6 rotor hub, runs out past the J7 motor, and lands on a
-# plate bolted to the J7 end cap — the part that enables the extra +25 deg of
-# radial deviation. Stock v2 meshes don't include it, so the generator emits a
-# stylised visual-only approximation as inline MJCF meshes (one mirrored mesh
-# per side) attached to the link6 gimbal body — the body that spans J6 → J7.
-# Cuboids are (center, half-size) in the LEFT link6 frame (J6 axis = y with
-# the rotor hub face at y ~ +0.045; J7 axis = x with the J7 motor housing —
-# the ee_base cylinder — spanning z -0.023..-0.113; the hand continues in -z);
-# the right side mirrors y. Sized against the model's own geom AABBs so the
-# lug lands on the J6 hub face and the foot on the J7 housing barrel — a
-# stylised take on the docs photo, not measured hardware.
-WRIST_BRACKET_BOXES = [
-    ((0.014, 0.0570, 0.000), (0.012, 0.0155, 0.013)),  # lug out from the J6 hub face
-    ((0.014, 0.0670, -0.034), (0.012, 0.0055, 0.040)),  # arm dropping past the housing
-    ((0.014, 0.0605, -0.068), (0.012, 0.0125, 0.012)),  # foot onto the J7 motor housing
-]
-WRIST_BRACKET_RGBA = (0.72, 0.06, 0.06, 1.0)
-WRIST_BRACKET_MATERIAL = "anvil_red"
+# The Anvil wrist support bracket, from the user-authored hardware CAD
+# (cad/anvil_openarm2_wrist_bracket_source.step; see also video IMG_0085.MOV):
+# two lap-jointed arm plates with round pivot lugs 80 mm apart, an integral
+# Ø10 spacer under the strap-side lug, and a strap ending in a two-bolt foot.
+# It is the part that enables the extra +25 deg of radial deviation.
+#
+# The bracket is rigid to the FOREARM (link5), spanning the J5 and J6
+# actuators: the foot bolts into the J6 motor case (link5 structure), the
+# far lug pivots at a forearm standoff, and the strap-side lug is an
+# outboard bearing seat ON the J6 axis — the gimbal shaft rotates within it,
+# so the part stays visually connected at both ends for any joint angle.
+#
+# cad/anvil_wrist_bracket.py places that STEP into the LEFT link5 frame
+# (strap-side lug bore on the J6 axis at link5 z -0.1205, spacer flush on
+# the gimbal hub face, far lug at link5 z -0.0405 where the forearm standoff
+# meets it, foot bolts at link5 z -0.1105/-0.1305 pointing inboard) and
+# exports the STL the generator ships. Regenerate the STL with the CAD skill
+# tooling when the source STEP changes. The right side mirrors y via a
+# negative mesh scale (the upstream v2 mesh convention).
+WRIST_BRACKET_MESH_SOURCE = "cad/anvil_wrist_bracket.stl"
+WRIST_BRACKET_MESH_ASSET = "anvil_wrist_bracket.stl"
+# file= reference in the generated XML, relative to the generated meshdir
+# (the upstream submodule assets dir), climbing back to models/assets/.
+WRIST_BRACKET_MESH_REF = f"../../../../models/assets/{WRIST_BRACKET_MESH_ASSET}"
+# STL is in millimetres of the LEFT link6 frame; the right side mirrors y.
+WRIST_BRACKET_MESH_SCALES = {"l": "0.001 0.001 0.001", "r": "0.001 -0.001 0.001"}
+# Expected AABB of the LEFT bracket mesh in metres (from the placed CAD
+# bounds: x -14..11, y 7.5..51.5, z -135.5..-35.5 mm), pinned so a stale or
+# misplaced STL fails scripts/check_model.py loudly.
+WRIST_BRACKET_MESH_AABB = ((-0.014, 0.0075, -0.1355), (0.011, 0.0515, -0.0355))
+WRIST_BRACKET_RGBA = (0.77, 0.78, 0.80, 1.0)
+WRIST_BRACKET_MATERIAL = "anvil_aluminum"
+WRIST_BRACKET_SCREW_RGBA = (0.015, 0.014, 0.013, 1.0)
+WRIST_BRACKET_SCREW_MATERIAL = "anvil_dark_fastener"
 WRIST_BRACKET_MESH_NAMES = {"l": "anvil_wrist_bracket_left", "r": "anvil_wrist_bracket_right"}
-WRIST_BRACKET_BODY_NAMES = {"l": "openarm_left_link6", "r": "openarm_right_link6"}
+WRIST_BRACKET_BODY_NAMES = {"l": "openarm_left_link5", "r": "openarm_right_link5"}
+# The J6 axis runs along y through link5 (x, z) = (0, -0.1205): the link6
+# body frame's position in link5. Used to pin the bearing-lug screw.
+J6_AXIS_XZ_IN_LINK5 = (0.0, -0.1205)
+# Dark fastener heads on the part's Ø3 holes, ((from), (to), radius) in the
+# LEFT link5 frame; the right side mirrors y. The strap-side lug screw sits
+# on the J6 axis (checked); the foot screws sit on the foot's outboard face,
+# pointing inboard along x toward the J6 motor case.
+WRIST_BRACKET_SCREW_CYLINDERS = {
+    "lug_j6_screw": ((0.000, 0.0515, -0.1205), (0.000, 0.0555, -0.1205), 0.0030),
+    "lug_forearm_screw": ((0.000, 0.0475, -0.0405), (0.000, 0.0515, -0.0405), 0.0030),
+    "foot_upper_screw": ((0.011, 0.0125, -0.1105), (0.015, 0.0125, -0.1105), 0.0030),
+    "foot_lower_screw": ((0.011, 0.0125, -0.1305), (0.015, 0.0125, -0.1305), 0.0030),
+}
+# Aluminum standoff on the forearm that the far lug pivots on, ((from),
+# (to), radius) in the LEFT link5 frame; the right side mirrors y. The inner
+# end starts just inside the forearm plate face (link5 y ~ 0.0323 at this z,
+# ray-measured) so the standoff seats on it; the outer end meets the bracket
+# far-lug inner face at y 0.0435.
+WRIST_BRACKET_LINK5_CYLINDERS = {
+    "forearm_standoff": ((0.000, 0.031, -0.0405), (0.000, 0.0435, -0.0405), 0.0050),
+}
+
+
+def wrist_bracket_screw_geom_names(side: str) -> dict:
+    """Geom names for the dark screw-head cylinders on one side ('l' or 'r')."""
+    return {
+        key: f"{WRIST_BRACKET_MESH_NAMES[side]}_{key}"
+        for key in WRIST_BRACKET_SCREW_CYLINDERS
+    }
+
+
+def wrist_bracket_link5_geom_names(side: str) -> dict:
+    """Geom names for the forearm-side standoff cylinders ('l' or 'r')."""
+    return {
+        key: f"{WRIST_BRACKET_MESH_NAMES[side]}_{key}"
+        for key in WRIST_BRACKET_LINK5_CYLINDERS
+    }

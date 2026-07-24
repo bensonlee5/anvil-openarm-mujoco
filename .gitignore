@@ -7,3 +7,4 @@ MUJOCO_LOG.TXT
 web/node_modules/
 web/dist/
 web/public/sim-assets/
+cad/.*.glb
