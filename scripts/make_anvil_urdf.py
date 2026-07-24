@@ -3,11 +3,13 @@
 
 Reads the xacro-expanded bimanual example URDF from the
 upstream/openarm_description submodule and writes an Anvil-variant copy into
-models/, applying the same local pre-arrival spec as make_anvil_model.py:
+models/, applying the same measured controller-coordinate wrist limits as
+make_anvil_model.py:
 
-  - J1: -135 deg .. +135 deg   (upstream: -200 .. +80 / -80 .. +200 per side)
-  - J6: -45 deg .. +70 deg     (upstream: -45 .. +45); the +25 deg is on the
-                                radial-deviation (+) side
+  - left J6:  -45 deg .. +70 deg
+  - right J6: -70 deg .. +45 deg
+
+All other ranges, including the asymmetric J1 and J2 limits, remain upstream.
 
 The patched numbers are identical to the MJCF ones because the upstream URDF
 and MJCF share joint axes and sign conventions on every joint (verified by
@@ -180,8 +182,6 @@ ROBOT_TAG_NEW = (
 # (pattern, replacement); each must match exactly once.
 SUBS: list[tuple[str, str]] = [
     literal(ROBOT_TAG_OLD, ROBOT_TAG_NEW),
-    limit_sub("openarm_left_joint1"),
-    limit_sub("openarm_right_joint1"),
     limit_sub("openarm_left_joint6"),
     limit_sub("openarm_right_joint6"),
     # TCP link+joint go just before each side's finger_joint1; the
@@ -205,9 +205,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 
 Derived from upstream/openarm_description
 assets/robot/openarm_v2.0/urdf/example/v2.urdf (enactic/openarm_description,
-Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP frames, plus the Anvil wrist support
-bracket from user hardware CAD (visual-only mesh + cylinder detail on the
+Apache-2.0) with Anvil OpenARM 2.0 controller-coordinate wrist limits:
+left J6 -45..+70 deg, right J6 -70..+45 deg, follower hand TCP frames, plus
+the Anvil wrist support bracket from user hardware CAD (visual-only mesh and
+cylinder detail on the
 link5 forearm links). Mesh references are rewritten from package:// URIs to
 paths relative to this directory.
 -->

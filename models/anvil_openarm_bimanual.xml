@@ -4,9 +4,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
     uv run python scripts/make_anvil_model.py
 
 Derived from upstream/openarm_mujoco/v2/openarm_bimanual.xml (enactic/openarm_mujoco,
-Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP sites, plus the Anvil wrist support
-bracket from user hardware CAD (visual-only STL meshes on the link6 bodies,
+Apache-2.0) with Anvil OpenARM 2.0 controller-coordinate wrist limits:
+left J6 -45..+70 deg, right J6 -70..+45 deg, follower hand TCP sites, plus
+the Anvil wrist support bracket from user hardware CAD (visual-only STL
+meshes on the link5 forearm bodies,
 with fastener and forearm-standoff cylinder details).
 -->
 <!--
@@ -192,7 +193,7 @@ limitations under the License.
       <geom name="base_link_left_collision_00" type="mesh" mesh="base_link_left_collision_00" class="collision" quat="0 0 1 0" />
       <body name="openarm_left_link1" pos="0 0.0625 0">
         <inertial pos="0.00090035 0.044466 2.88441e-05" quat="0.999901 -0.000371041 -5.04627e-05 -0.0140338" mass="1.14167" diaginertia="0.00109459 0.000758935 0.000670659" />
-        <joint name="openarm_left_joint1" pos="0 0 0" axis="0 1 0" range="-2.3562 2.3562" actuatorfrcrange="-40 40" class="motor_DM8009" />
+        <joint name="openarm_left_joint1" pos="0 0 0" axis="0 1 0" range="-3.4907 1.3963" actuatorfrcrange="-40 40" class="motor_DM8009" />
         <geom name="link1_left_00" type="mesh" mesh="link1_left_00" class="visual" material="matte_black" />
         <geom name="link1_left_01" type="mesh" mesh="link1_left_01" class="visual" material="pale_silver" />
         <geom name="link1_left_02" type="mesh" mesh="link1_left_02" class="visual" material="metal_silver" />
@@ -287,7 +288,7 @@ limitations under the License.
       <geom name="base_link_right_collision_00" type="mesh" mesh="base_link_right_collision_00" class="collision" quat="0 0 1 0" />
       <body name="openarm_right_link1" pos="0 -0.0625 0">
         <inertial pos="0.00090035 -0.044466 2.88441e-05" quat="0.999901 0.000371041 -5.04627e-05 0.0140338" mass="1.14167" diaginertia="0.00109459 0.000758935 0.000670659" />
-        <joint name="openarm_right_joint1" pos="0 0 0" axis="0 -1 0" range="-2.3562 2.3562" actuatorfrcrange="-40 40" class="motor_DM8009" />
+        <joint name="openarm_right_joint1" pos="0 0 0" axis="0 -1 0" range="-1.3963 3.4907" actuatorfrcrange="-40 40" class="motor_DM8009" />
         <geom name="link1_right_00" type="mesh" mesh="link1_right_00" class="visual" material="matte_black" />
         <geom name="link1_right_01" type="mesh" mesh="link1_right_01" class="visual" material="pale_silver" />
         <geom name="link1_right_02" type="mesh" mesh="link1_right_02" class="visual" material="metal_silver" />
@@ -330,7 +331,7 @@ limitations under the License.
                 <geom name="anvil_wrist_bracket_right_forearm_standoff" type="cylinder" fromto="0 -0.031 -0.0405 0 -0.0435 -0.0405" size="0.005" class="visual" material="anvil_aluminum" />
                 <body name="openarm_right_link6" pos="0 0 -0.1205">
                   <inertial pos="2.27438e-05 0.000686496 5.44e-05" quat="0.999832 0.0183155 0.000397003 0.000757974" mass="0.475203" diaginertia="0.000179276 0.000136249 0.000135339" />
-                  <joint name="openarm_right_joint6" pos="0 0 0" axis="0 1 0" range="-0.7854 1.2217" actuatorfrcrange="-7 7" class="motor_DM4310" />
+                  <joint name="openarm_right_joint6" pos="0 0 0" axis="0 1 0" range="-1.2217 0.7854" actuatorfrcrange="-7 7" class="motor_DM4310" />
                   <geom name="link6_right_00" type="mesh" mesh="link6_right_00" class="visual" material="matte_black" />
                   <geom name="link6_right_01" type="mesh" mesh="link6_right_01" class="visual" material="metal_silver" />
                   <geom name="link6_right_02" type="mesh" mesh="link6_right_02" class="visual" material="pale_silver" />
@@ -381,7 +382,7 @@ limitations under the License.
     <joint name="openarm_right_ee_finger_joint_mimic" joint1="openarm_right_finger_joint1" joint2="openarm_right_finger_joint2" polycoef="0 1 0 0 0" solimp="0.95 0.99 0.001" solref="0.005 1" />
   </equality>
   <actuator>
-    <position name="left_joint1_ctrl" joint="openarm_left_joint1" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-2.35619 2.35619" />
+    <position name="left_joint1_ctrl" joint="openarm_left_joint1" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-3.49066 1.39626" />
     <position name="left_joint2_ctrl" joint="openarm_left_joint2" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-3.31613 0.174533" />
     <position name="left_joint3_ctrl" joint="openarm_left_joint3" class="position_DM4340" kp="190" kv="2.2" ctrllimited="true" ctrlrange="-1.5708 1.5708" />
     <position name="left_joint4_ctrl" joint="openarm_left_joint4" class="position_DM4340" kp="190" kv="2.2" ctrllimited="true" ctrlrange="0 2.44346" />
@@ -389,12 +390,12 @@ limitations under the License.
     <position name="left_joint6_ctrl" joint="openarm_left_joint6" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-0.785398 1.22173" />
     <position name="left_joint7_ctrl" joint="openarm_left_joint7" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-1.5708 1.5708" />
     <position name="left_finger1_ctrl" joint="openarm_left_finger_joint1" class="position_DM4310" kp="30" kv="0.2" ctrllimited="true" ctrlrange="0 0.7854" />
-    <position name="right_joint1_ctrl" joint="openarm_right_joint1" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-2.35619 2.35619" />
+    <position name="right_joint1_ctrl" joint="openarm_right_joint1" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-1.39626 3.49066" />
     <position name="right_joint2_ctrl" joint="openarm_right_joint2" class="position_DM8009" kp="230" kv="2.7" ctrllimited="true" ctrlrange="-0.174533 3.31613" />
     <position name="right_joint3_ctrl" joint="openarm_right_joint3" class="position_DM4340" kp="190" kv="2.2" ctrllimited="true" ctrlrange="-1.5708 1.5708" />
     <position name="right_joint4_ctrl" joint="openarm_right_joint4" class="position_DM4340" kp="190" kv="2.2" ctrllimited="true" ctrlrange="0 2.44346" />
     <position name="right_joint5_ctrl" joint="openarm_right_joint5" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-1.5708 1.5708" />
-    <position name="right_joint6_ctrl" joint="openarm_right_joint6" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-0.785398 1.22173" />
+    <position name="right_joint6_ctrl" joint="openarm_right_joint6" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-1.22173 0.785398" />
     <position name="right_joint7_ctrl" joint="openarm_right_joint7" class="position_DM4310" kp="30" kv="1.5" ctrllimited="true" ctrlrange="-1.5708 1.5708" />
     <position name="right_finger1_ctrl" joint="openarm_right_finger_joint1" class="position_DM4310" kp="30" kv="0.2" ctrllimited="true" ctrlrange="-0.7854 0" />
   </actuator>

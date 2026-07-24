@@ -4,7 +4,7 @@
 Cycles through three phases on both arms, reading the limits from the model's
 actuator ctrlranges (so it always demonstrates exactly the Anvil ranges):
 
-  1. J6 radial/ulnar deviation sweep  (-45 deg .. +70 deg, the extended range)
+  1. J6 radial/ulnar deviation sweep  (side-specific mirrored extended range)
   2. J7 flexion/extension sweep       (-90 deg .. +90 deg)
   3. combined circular wrist motion
 
@@ -63,8 +63,13 @@ def main() -> None:
     j6 = [act("left_joint6_ctrl"), act("right_joint6_ctrl")]
     j7 = [act("left_joint7_ctrl"), act("right_joint7_ctrl")]
     for label, aids in (("J6 (deviation)", j6), ("J7 (flexion/extension)", j7)):
-        lo, hi = model.actuator_ctrlrange[aids[0]]
-        print(f"{label}: sweeping {math.degrees(lo):+.1f} .. {math.degrees(hi):+.1f} deg")
+        for aid in aids:
+            lo, hi = model.actuator_ctrlrange[aid]
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, aid)
+            print(
+                f"{label} {name}: sweeping {math.degrees(lo):+.1f} .. "
+                f"{math.degrees(hi):+.1f} deg"
+            )
 
     def full_sweep(aids: list[int], s: float) -> dict[int, float]:
         # lo -> hi -> lo over one phase, starting and ending at the midpoint

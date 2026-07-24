@@ -5,9 +5,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
 
 Derived from upstream/openarm_description
 assets/robot/openarm_v2.0/urdf/example/v2.urdf (enactic/openarm_description,
-Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP frames, plus the Anvil wrist support
-bracket from user hardware CAD (visual-only mesh + cylinder detail on the
+Apache-2.0) with Anvil OpenARM 2.0 controller-coordinate wrist limits:
+left J6 -45..+70 deg, right J6 -70..+45 deg, follower hand TCP frames, plus
+the Anvil wrist support bracket from user hardware CAD (visual-only mesh and
+cylinder detail on the
 link5 forearm links). Mesh references are rewritten from package:// URIs to
 paths relative to this directory.
 -->
@@ -104,7 +105,7 @@ paths relative to this directory.
     <parent link="openarm_left_base_link"/>
     <child link="openarm_left_link1"/>
     <axis xyz="0 1 0"/>
-    <limit effort="40" lower="-2.3562" upper="2.3562" velocity="16.755"/>
+    <limit effort="40" lower="-3.4907" upper="1.3963" velocity="16.755"/>
   </joint>
   <link name="openarm_left_link2">
     <visual name="openarm_left_link2_visual">
@@ -442,7 +443,7 @@ paths relative to this directory.
     <parent link="openarm_right_base_link"/>
     <child link="openarm_right_link1"/>
     <axis xyz="0 -1 0"/>
-    <limit effort="40" lower="-2.3562" upper="2.3562" velocity="16.755"/>
+    <limit effort="40" lower="-1.3963" upper="3.4907" velocity="16.755"/>
   </joint>
   <link name="openarm_right_link2">
     <visual name="openarm_right_link2_visual">
@@ -629,7 +630,7 @@ paths relative to this directory.
     <parent link="openarm_right_link5"/>
     <child link="openarm_right_link6"/>
     <axis xyz="0 1 0"/>
-    <limit effort="7" lower="-0.7854" upper="1.2217" velocity="20.944"/>
+    <limit effort="7" lower="-1.2217" upper="0.7854" velocity="20.944"/>
   </joint>
   <joint name="openarm_right_joint7" type="revolute">
     <origin rpy="0 0 0" xyz="0 0 0"/>

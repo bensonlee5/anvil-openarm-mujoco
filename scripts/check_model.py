@@ -2,14 +2,12 @@
 """Validate the generated Anvil OpenARM 2.0 models against the local spec.
 
 The live Anvil OpenARM 2.0 docs describe the wrist swap and wider J6
-radial/ulnar deviation qualitatively. This repo keeps a local pre-arrival
-numeric spec for the expected Anvil variant. It differs from standard/enactic
-OpenArm v2 in exactly two joints per arm:
+radial/ulnar deviation qualitatively. Real Anvil shirt-fold sessions resolve
+the wider direction in controller coordinates. The generated model differs
+from standard/enactic OpenArm v2 in J6 only:
 
-  - J1: -135 deg .. +135 deg   (standard v2: -80 .. +200 in MJCF convention)
-  - J6: -45 deg .. +70 deg     (standard v2: -45 .. +45); J6 is radial/ulnar
-                                deviation after the v2 wrist swap, and the
-                                extra 25 deg is on the radial (+) side
+  - left J6:  -45 deg .. +70 deg
+  - right J6: -70 deg .. +45 deg
 
 The generated bimanual model also exposes follower_{l,r}_hand_tcp sites using
 the upstream OpenArm v2 pinch-gripper grasp frame. Everything else must remain
@@ -113,7 +111,7 @@ def check_joint_ranges(model: mujoco.MjModel, tag: str) -> None:
     if len(failures) == before:
         ok(f"{tag}: all 14 arm joint ranges match the local Anvil 2.0 spec")
 
-    # Bimanual mirror consistency: identical numeric ranges on mirrored axes.
+    # Bimanual mirror consistency for the numerically symmetric joints.
     for jname in ARM_JOINT_RANGES:
         lid = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_JOINT, f"openarm_left_{jname}"

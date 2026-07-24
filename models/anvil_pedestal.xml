@@ -3,9 +3,10 @@ GENERATED FILE - do not edit by hand. Regenerate with:
     uv run python scripts/make_anvil_model.py
 
 Derived from upstream/openarm_mujoco/v2/pedestal.xml (enactic/openarm_mujoco,
-Apache-2.0) with Anvil OpenARM 2.0 local spec changes: J1 +/-135 deg,
-J6 -45..+70 deg, follower hand TCP sites, plus the Anvil wrist support
-bracket from user hardware CAD (visual-only STL meshes on the link6 bodies,
+Apache-2.0) with Anvil OpenARM 2.0 controller-coordinate wrist limits:
+left J6 -45..+70 deg, right J6 -70..+45 deg, follower hand TCP sites, plus
+the Anvil wrist support bracket from user hardware CAD (visual-only STL
+meshes on the link5 forearm bodies,
 with fastener and forearm-standoff cylinder details).
 -->
 <!--
